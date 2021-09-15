@@ -1,0 +1,67 @@
+{
+
+    "Simulation" : {
+        "results_dir" : "config_example_dfs"
+    },    
+
+    "Physics" : {
+        "events_to_simulate" : 2, 
+        "monoenergetic" : true,
+        "energy" : 17.8e3, 
+        "min_rho" : 0,
+        "max_rho" : 5.78e-3,
+        "min_z" : -5e-3,
+        "max_z" : 5e-3,
+        "min_theta" : 85,
+        "max_theta" : 90
+    },
+
+    "Hardware" : {
+        "hardware_freqbw_max" : 19.3e9,
+        "hardware_freqbw_min" : 17.6e9,
+        "main_field" : 0.689,
+        "trap_strength" : 1e-3,
+        "decay_cell_radius" : 5.78e-3,
+        "base_num_sidebands" : 7,
+        "sideband_tolerance" : 0.99,
+        "standard_decay_cell_radius" : true,
+        "standard_trap_geometry" : true,
+        "calculate_axial_frequencies" : true
+    },
+    
+    "Kinematics" : {
+        "mean_track_length" : 10e-3,
+        "jump_size_eV" : 0,
+        "jump_std_eV" : 0,
+        "pitch_angle_costheta_std" : 0.00,
+        "jump_num_max" : 3
+    },
+
+    "BandBuilder" : {
+        "sideband_num": 2,
+        "frac_total_segment_power_cut" : 0.0 
+
+    },
+
+    "TrackBuilder" : {
+        "trackbuilder_freqbw_max" : 19.3e9,
+        "trackbuilder_freqbw_min" : 17.6e9,
+        "run_length" : 0.5, 
+        "decay_rate" : 1e3
+    },
+
+    "DAQ" : {
+        "daq_freqbw_max" : 19.1e9,
+        "daq_freqbw_min" : 17.9e9,
+        "fft_length" : 27e-6,
+        "freq_bin_width" : 37e3,
+        "spec_avg" : 2,
+        "noise_floor" : "path/to/noise.csv",
+        "gain" : "path/to/gain.csv"
+    }
+    
+
+}
+
+
+
