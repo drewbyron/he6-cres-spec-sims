@@ -9,9 +9,14 @@ import pandas as pd
 
 from he6_cres_spec_sims import simulation_blocks as sim_blocks
 
-# Plt settings: 
-plt.rcParams['figure.dpi'] = 220
-plt.rcParams.update({'font.size': 10})
+# Plt settings:
+plt.rcParams["figure.dpi"] = 220
+plt.rcParams.update({"font.size": 10})
+
+# Pandas settings.
+pd.set_option('display.max_rows', 100)
+pd.set_option('display.max_columns', 100)
+
 
 def read_saved_df(config, filename):
     """TODO: DOCUMENT"""
@@ -31,7 +36,7 @@ def read_saved_df(config, filename):
     return df
 
 
-def tracks(config, power_color = True, time_interval = 1e-8):
+def tracks(config, power_color=True, time_interval=1e-8):
     """TODO: DOCUMENT"""
 
     filename = "trackbuilder_tracks_df"
@@ -40,16 +45,11 @@ def tracks(config, power_color = True, time_interval = 1e-8):
     try:
         tracks_df = read_saved_df(config, filename)
     except Exception as e:
-        print(
-            "tracks_df not loaded. \n \
-             Have you run the simulation associated with this config?"
-        )
+        print("Have you run the simulation associated with this config?")
         raise e
 
     # Create visualization of tracks
     run_length = config.trackbuilder.run_length
-    # TODO: This being hardcoded could be a problem.
-    
     power_max = tracks_df["band_power"].max()
     power_min = tracks_df["band_power"].min()
 
@@ -68,11 +68,12 @@ def tracks(config, power_color = True, time_interval = 1e-8):
 
         time = np.arange(time_start, time_stop, time_interval)
         freq = slope * (time - time_start) + freq_start
-        if power_color: 
+
+        if power_color:
             color = power_to_color(power)
-        else: 
+        else:
             color = 0
- 
+
         plt.plot(time_start, freq_start, "go")
         plt.plot(time, freq, color=str(color))
 
