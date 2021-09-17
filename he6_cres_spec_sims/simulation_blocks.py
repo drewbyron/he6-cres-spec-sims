@@ -120,12 +120,13 @@ class Hardware:
         self.physics = Physics(config)
 
     def construct_trapped_events_df(self):
-
+        print("~~~~~~~~~~~~Hardware Block~~~~~~~~~~~~~~\n")
+        print("Constructing a set of trapped events:")
         event_num = 0
         events_to_simulate = self.config.physics.events_to_simulate
         while event_num < events_to_simulate:
 
-            print("\n Event: {}/{}...\n".format(event_num, events_to_simulate - 1))
+            print("\nEvent: {}/{}...\n".format(event_num, events_to_simulate - 1))
 
             # generate trapped beta
             is_trapped = False
@@ -183,7 +184,7 @@ class Hardware:
             initial_zpos, rho_center, initial_pitch_angle, self.config.trap_profile
         )
 
-        # Used to determine if trapped.
+        # Use trapped_initial_pitch_angle to determine if trapped.
         trapped_initial_pitch_angle = sc.min_theta(
             rho_center, initial_zpos, self.config.trap_profile
         )
@@ -264,16 +265,13 @@ class Kinematics:
 
     def scatter(self, trapped_event_df):
         """TODO: DOCUMENT"""
-
-        # Constants.
-        J = 1 / (1.60217733e-19)
-
+        print("~~~~~~~~~~~~Kinematics Block~~~~~~~~~~~~~~\n")
         # Empty list to be filled with scattered segments.
         scattered_segments_list = []
 
         for event_index, event in trapped_event_df.iterrows():
 
-            print("Scattering Event :", event_index)
+            print("\nScattering Event :", event_index)
 
             # Assign segment 0 of event with a segment_length.
             event["segment_length"] = self.segment_length()
@@ -306,7 +304,7 @@ class Kinematics:
 
             # The loop breaks when the trap condition is False or the jump_num exceeds self.jump_num_max.
             while True:
-
+                print("Jump: {jump_num}".format(jump_num=jump_num))
                 scattered_segment = event.copy()
 
                 # Physics happens. This could maybe be wrapped into a different method.
@@ -348,7 +346,15 @@ class Kinematics:
 
                 # If the event is not trapped or the max number of jumps has been reached,
                 # we do not want to write the df to the scattered_segments_list.
-                if not is_trapped or (jump_num > self.config.kinematics.jump_num_max):
+                if not is_trapped:
+                    print("Event no longer trapped.")
+                    break
+                if jump_num > self.config.kinematics.jump_num_max:
+                    print(
+                        "Event reached jump_num_max : {}".format(
+                            self.config.kinematics.jump_num_max
+                        )
+                    )
                     break
 
                 scattered_segment_df["segment_num"] = jump_num
@@ -438,6 +444,7 @@ class BandBuilder:
 
     def bandbuilder(self, segments_df):
 
+        print("~~~~~~~~~~~~BandBuilder Block~~~~~~~~~~~~~~\n")
         sideband_num = self.config.bandbuilder.sideband_num
         frac_total_segment_power_cut = (
             self.config.bandbuilder.frac_total_segment_power_cut
@@ -477,6 +484,7 @@ class BandBuilder:
 
         return bands_df
 
+
 class TrackBuilder:
     """TODO:Document"""
 
@@ -485,52 +493,85 @@ class TrackBuilder:
         self.config = config
 
     def trackbuilder(self, bands_df):
+
+        print("~~~~~~~~~~~~TrackBuilder Block~~~~~~~~~~~~~~\n")
         run_length = self.config.trackbuilder.run_length
         events_to_simulate = self.config.physics.events_to_simulate
 
-        # TODO: Event timing is not currently physical. 
-        # Add time/freq start/stop.   
+        # TODO: Event timing is not currently physical.
+        # Add time/freq start/stop.
         tracks_df = bands_df.copy()
         tracks_df["time_start"] = np.NaN
         tracks_df["time_stop"] = np.NaN
-    
+
         tracks_df["freq_start"] = bands_df["avg_cycl_freq"]
-        tracks_df["freq_stop"] = bands_df["slope"]*bands_df["segment_length"]+bands_df["avg_cycl_freq"]
+        tracks_df["freq_stop"] = (
+            bands_df["slope"] * bands_df["segment_length"] + bands_df["avg_cycl_freq"]
+        )
 
-        # dealing with timing of the events. 
-        # for now just put all events in the window... need to think about this. 
-        trapped_event_start_times = np.random.uniform(0,run_length,events_to_simulate)
-        
+        # dealing with timing of the events.
+        # for now just put all events in the window... need to think about this.
+        trapped_event_start_times = np.random.uniform(0, run_length, events_to_simulate)
+
         # iterate through the segment zeros and fill in start times.
-        
-        for index, row in bands_df[bands_df["segment_num"]==0.0].iterrows():
-#             print(index)
+
+        for index, row in bands_df[bands_df["segment_num"] == 0.0].iterrows():
+            #             print(index)
             event_num = int(tracks_df["event_num"][index])
-#             print(event_num)
+            #             print(event_num)
             tracks_df["time_start"][index] = trapped_event_start_times[event_num]
-        
-        for event in range(0,events_to_simulate): 
-            
+
+        for event in range(0, events_to_simulate):
+
             # find max segment_num for each event
-            segment_num_max = int(bands_df[bands_df["event_num"]==event]["segment_num"].max())
+            segment_num_max = int(
+                bands_df[bands_df["event_num"] == event]["segment_num"].max()
+            )
 
-            for segment in range(1,segment_num_max+1):
+            for segment in range(1, segment_num_max + 1):
 
-                fill_condition = ((tracks_df["event_num"]== float(event)) & (tracks_df["segment_num"] == segment))
-                previous_time_condition = ((tracks_df["event_num"]== event) & (tracks_df["segment_num"] == segment-1) 
-                                           & (tracks_df["band_num"] == 0.0) )
-#                 print("previous_time_condition : ", previous_time_condition)
-                previous_segment_time_start = tracks_df[previous_time_condition]["time_start"].iloc[0]
-                previous_segment_length = tracks_df[previous_time_condition]["segment_length"].iloc[0]
+                fill_condition = (tracks_df["event_num"] == float(event)) & (
+                    tracks_df["segment_num"] == segment
+                )
+                previous_time_condition = (
+                    (tracks_df["event_num"] == event)
+                    & (tracks_df["segment_num"] == segment - 1)
+                    & (tracks_df["band_num"] == 0.0)
+                )
+                #                 print("previous_time_condition : ", previous_time_condition)
+                previous_segment_time_start = tracks_df[previous_time_condition][
+                    "time_start"
+                ].iloc[0]
+                previous_segment_length = tracks_df[previous_time_condition][
+                    "segment_length"
+                ].iloc[0]
 
-                for index, row in tracks_df[fill_condition].iterrows(): 
-                    tracks_df["time_start"][index] = previous_segment_time_start + previous_segment_length
-                    
+                for index, row in tracks_df[fill_condition].iterrows():
+                    tracks_df["time_start"][index] = (
+                        previous_segment_time_start + previous_segment_length
+                    )
 
-        tracks_df["time_stop"] = tracks_df["time_start"]+ tracks_df["segment_length"]
+        tracks_df["time_stop"] = tracks_df["time_start"] + tracks_df["segment_length"]
 
-        tracks_df = tracks_df.drop(columns = ["initial_rho_pos","initial_zpos","initial_pitch_angle", "trapped_initial_pitch_angle",
-                              "initial_phi_dir", "center_theta", "initial_field", "initial_radius",
-                              "center_x", "center_y", "rho_center", "max_radius", "zmax", "mod_index", "avg_cycl_freq", "axial_freq"])
-        
+        tracks_df = tracks_df.drop(
+            columns=[
+                "initial_rho_pos",
+                "initial_zpos",
+                "initial_pitch_angle",
+                "trapped_initial_pitch_angle",
+                "initial_phi_dir",
+                "center_theta",
+                "initial_field",
+                "initial_radius",
+                "center_x",
+                "center_y",
+                "rho_center",
+                "max_radius",
+                "zmax",
+                "mod_index",
+                "avg_cycl_freq",
+                "axial_freq",
+            ]
+        )
+
         return tracks_df

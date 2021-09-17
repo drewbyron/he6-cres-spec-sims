@@ -24,7 +24,7 @@ class Field_profile:
 
         self._z_offset = 0
 
-        if interp and main_field != 0: 
+        if interp and main_field != 0:
             self.initialize_field_strength_interp()
         # self.field_strength_interpolated_function = None
 
@@ -196,18 +196,15 @@ class Field_profile:
         rho_array = np.arange(0, waveguide_radius, grid_edge_length)
         z_array = np.arange(-trap_zmax, trap_zmax, grid_edge_length)
 
-        start = time.process_time()
-
         filepath = "{}/he6_cres_spec_sims/spec_tools/coil_classes/field_profile_pkl_files/main_field_{}_trap_strength_{}.csv".format(
             os.getcwd(), self.main_field, self.trap_strength
         )
         try:
             with open(filepath, "r") as pkl_file:
                 map_array = np.loadtxt(pkl_file)
-                print("Reading the map_array from csv. \nfilepath: ", filepath)
-        
-        except IOError:
 
+        except IOError:
+            start = time.process_time()
             map_array = np.zeros((z_array.shape[0], rho_array.shape[0]))
 
             B = lambda rho, z: self.field_strength(rho, z)
@@ -217,13 +214,12 @@ class Field_profile:
                     map_array[i][j] = B(rho, z)
 
             np.savetxt(filepath, map_array)
+            tot_time = time.process_time() - start
+            print("Time to create map_array for new field settings:", tot_time, "\n")
             print("Writing the map_array to csv. \nfilepath: ", filepath)
 
-        # Now use the map_array to do the interpolation. 
+        # Now use the map_array to do the interpolation.
         B_interp2d = interp2d(rho_array, z_array, map_array, kind="cubic")
-
-        tot_time = time.process_time() - start
-        print("Time to initialize field_strength_interp = ", tot_time, "\n")
 
         # Making it vectorized, meaning float or np array can be inputs.
         def B_interp(rho, z):

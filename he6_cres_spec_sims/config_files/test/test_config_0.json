@@ -1,11 +1,9 @@
 {
 
-    "Configure_Simulation" : {
-        "check_for_existing_sim_data" : true,
-        "simulation_results_dir" : "Example_Simulation_dfs",
-        "simulation_results_file_prefix" : "Not sure I need this"
-
+    "Simulation" : {
+        "results_dir" : "config_example_dfs"
     },    
+   
 
     "Physics" : {
         "events_to_simulate" : 2, 

@@ -23,43 +23,42 @@ class Simulation:
 
     def run(self):
 
-        # Initialize all simulation blocks:
+        # Initialize all simulation blocks.
         hardware = sim_blocks.Hardware(self.config)
         kinematics = sim_blocks.Kinematics(self.config)
         bandbuilder = sim_blocks.BandBuilder(self.config)
         trackbuilder = sim_blocks.TrackBuilder(self.config)
 
+        # Create a set of trapped events.
         trapped_events_df = hardware.construct_trapped_events_df()
-        # save the trapped events df:
         self.save_df(trapped_events_df, "hardware_trapped_events_df")
 
-        # add scattering.
+        # Scatter the trapped events, creating segments.
         segments_df = kinematics.scatter(trapped_events_df)
-
-        # save the scattered segments df:
         self.save_df(segments_df, "kinematics_segments_df")
 
-        # apply band builder.
+        # Build out the bands of the segments.
         bands_df = bandbuilder.bandbuilder(segments_df)
+        self.save_df(bands_df, "bandbuilder_bands_df")
 
-        # save the scattered segments df:
-        self.save_df(bands_df,"bandbuilder_bands_df" )
-
-        # apply track builder.
+        # Add event start times and drop columns, creating tracks.
         tracks_df = trackbuilder.trackbuilder(bands_df)
-
-        # save the scattered segments df:
-        self.save_df(tracks_df,"trackbuilder_tracks_df" )
+        self.save_df(tracks_df, "trackbuilder_tracks_df")
 
         return None
 
     def save_df(self, df, filename):
         """TODO: DOCUMENT"""
+        print("\n**Block Output:**")
 
         results_dir = "{}/he6_cres_spec_sims/simulation_results/{}".format(
             os.getcwd(), self.config.simulation.results_dir
         )
-        print("{} being written to {}".format(filename, results_dir))
+        print(
+            "{} written to /he6_cres_spec_sims/simulation_results/{}\n".format(
+                filename, self.config.simulation.results_dir
+            )
+        )
         exists = os.path.isdir(results_dir)
         # print(exists)
 
@@ -75,20 +74,3 @@ class Simulation:
             raise e
 
         return 0
-
-    def read_saved_df(self, filename):
-        """TODO: DOCUMENT"""
-
-        results_dir = "{}/he6_cres_spec_sims/simulation_results/{}".format(
-            os.getcwd(), self.config.simulation.results_dir
-        )
-        try:
-            df = pd.read_csv(
-                "{}/{}.csv".format(results_dir, filename),
-                index_col=[0],
-            )
-        except Exception as e:
-            print("File filename not found.")
-            raise e
-
-        return df
