@@ -41,14 +41,15 @@ class TestConfig:
 
 # Test Physics Block.
 class TestPhysics:
-    def test_Physics(self, physics):
+    def test_Physics(self, config):
+        physics = sim_blocks.Physics(config)
         assert physics.config.physics.events_to_simulate == 2
 
 
 # Test Hardware Block.
 class TestHardware:
-    
-    # Preparing input data for testing trap_condition. 
+
+    # Preparing input data for testing trap_condition.
     data_0 = {
         "initial_pitch_angle": [90],
         "trapped_initial_pitch_angle": [87],
@@ -75,9 +76,9 @@ class TestHardware:
     @pytest.mark.parametrize(
         "test_df, expected_trap_condition", [(df_0, True), (df_1, False), (df_2, False)]
     )
-    def test_trap_condition(self, hardware, test_df, expected_trap_condition):
-        # print(hardware.cnfg.events_to_simulate)
-
+    def test_trap_condition(self, blank_config, test_df, expected_trap_condition):
+        
+        hardware = sim_blocks.Hardware(blank_config)
         trap_condition = hardware.trap_condition(test_df)
         assert trap_condition == expected_trap_condition
 
@@ -85,8 +86,44 @@ class TestHardware:
     def test_construct_untrapped_segment_df(self):
         pass
 
-# Test Kinematics Block.
 class TestKinematics:
-    @pytest.mark.skip(reason="test shell")
-    def test_Kinematics(self):
-        pass
+    
+
+    # @pytest.mark.skip(reason="test shell")
+    def test_Kinematics(self, blank_config, blank_band_df):
+
+        # Alter blank_config as needed for test.
+        blank_config.kinematics.mean_track_length = 1e-3
+        blank_config.kinematics.jump_num_max = 4
+        blank_config.hardware.decay_cell_radius = 1e-2
+
+        # Alter blank_band_df as needed for test.
+        blank_band_df["energy"] = 20e3
+        blank_band_df["center_theta"] = 90.0
+
+        kinematics = sim_blocks.Kinematics(blank_config)
+        scattered_df = kinematics.scatter(blank_band_df)
+        assert scattered_df.shape[0] == blank_config.kinematics.jump_num_max + 1
+
+
+class TestBandBuilder:
+    
+
+    # @pytest.mark.skip(reason="test shell")
+    def test_BandBuilder(self, blank_config, blank_band_df):
+
+        # Alter blank_config as needed for test.
+        blank_config.bandbuilder.sideband_num = 10
+        blank_config.bandbuilder.frac_total_segment_power_cut = 0.0
+
+        # Alter blank_band_df as needed for test.
+        blank_band_df["avg_cycl_freq"] = 1.862263e+10
+        blank_band_df["axial_freq"] = 2.787875e+07
+        blank_band_df["zmax"] = 0.008227    
+        blank_band_df["segment_power"] = 1e-15
+
+
+        bandbuilder = sim_blocks.BandBuilder(blank_config)
+        bandbuilder_df = bandbuilder.bandbuilder(blank_band_df)
+        assert bandbuilder_df.shape[0] == blank_config.bandbuilder.sideband_num*2 + 1
+        assert np.allclose(bandbuilder_df["band_power"].sum(),blank_band_df["segment_power"])

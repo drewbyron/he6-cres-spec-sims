@@ -18,16 +18,10 @@
     },
 
     "Hardware" : {
-        "hardware_freqbw_max" : 19.3e9,
-        "hardware_freqbw_min" : 17.6e9,
+
         "main_field" : 0.689,
         "trap_strength" : 1e-3,
-        "decay_cell_radius" : 5.78e-3,
-        "base_num_sidebands" : 7,
-        "sideband_tolerance" : 0.99,
-        "standard_decay_cell_radius" : true,
-        "standard_trap_geometry" : true,
-        "calculate_axial_frequencies" : true
+        "decay_cell_radius" : 5.78e-3
     },
     
     "Kinematics" : {
@@ -45,8 +39,6 @@
     },
 
     "TrackBuilder" : {
-        "trackbuilder_freqbw_max" : 19.3e9,
-        "trackbuilder_freqbw_min" : 17.6e9,
         "run_length" : 0.5, 
         "decay_rate" : 1e3
     },

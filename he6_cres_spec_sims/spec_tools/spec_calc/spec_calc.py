@@ -353,8 +353,8 @@ def axial_freq_not_vect(energy, center_pitch_angle, rho, trap_profile):
 
     if trap_profile.is_trap:
         # center_pitch_angle = np.where(center_pitch_angle == 90.0, 89.999, center_pitch_angle)
-        if center_pitch_angle == 90:
-            center_pitch_angle = 89.9999
+        if center_pitch_angle == 90.0:
+            center_pitch_angle = 89.999
 
         zmax = max_zpos(center_pitch_angle, rho, trap_profile)
         B = lambda z: trap_profile.field_strength_interp(rho, z)
@@ -402,7 +402,7 @@ def avg_cycl_freq_not_vect(energy, center_pitch_angle, rho, trap_profile):
             print("Warning: electron not trapped")
             return False
 
-        if center_pitch_angle == 90:
+        if center_pitch_angle == 90.0:
             avg_cyc_freq = energy_to_freq(energy, Bmin)
 
         else:
@@ -446,8 +446,8 @@ def t_not_vect(energy, zpos, center_pitch_angle, rho, trap_profile):
 
     if trap_profile.is_trap:
 
-        if center_pitch_angle == 90:
-            center_pitch_angle = 89.9999
+        if center_pitch_angle == 90.0:
+            center_pitch_angle = 89.999
 
         zmax = max_zpos(center_pitch_angle, rho, trap_profile)
         B = lambda z: trap_profile.field_strength_interp(rho, z)

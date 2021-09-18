@@ -455,7 +455,7 @@ class BandBuilder:
 
         for segment_index, row in segments_df.iterrows():
 
-            sideband_magnitudes = sc.sideband_calc(
+            sideband_amplitudes = sc.sideband_calc(
                 row["avg_cycl_freq"],
                 row["axial_freq"],
                 row["zmax"],
@@ -464,16 +464,17 @@ class BandBuilder:
 
             for i, band_num in enumerate(range(-sideband_num, sideband_num + 1)):
 
-                if sideband_magnitudes[i][1] < frac_total_segment_power_cut:
+                if sideband_amplitudes[i][1] < frac_total_segment_power_cut:
                     continue
                 else:
                     # copy segment in order to fill in band specific values
                     row_copy = row.copy()
 
                     # fill in new avg_cycl_freq, band_power, band_num
-                    row_copy["avg_cycl_freq"] = sideband_magnitudes[i][0]
+                    row_copy["avg_cycl_freq"] = sideband_amplitudes[i][0]
+                    # Note that the sideband amplitudes need to be squared to give power.
                     row_copy["band_power"] = (
-                        sideband_magnitudes[i][1] * row.segment_power
+                        sideband_amplitudes[i][1] ** 2 * row.segment_power
                     )
                     row_copy["band_num"] = band_num
 
