@@ -21,13 +21,17 @@ class Simulation:
 
         self.config = config
 
-    def run(self):
+    def run_full(self):
+        """TODO: DOCUMENT"""
 
         # Initialize all simulation blocks.
         hardware = sim_blocks.Hardware(self.config)
         kinematics = sim_blocks.Kinematics(self.config)
         bandbuilder = sim_blocks.BandBuilder(self.config)
         trackbuilder = sim_blocks.TrackBuilder(self.config)
+        downmixer = sim_blocks.DownMixer(self.config)
+        daq = sim_blocks.Daq(self.config)
+        specbuilder = sim_blocks.SpecBuilder(self.config)
 
         # Create a set of trapped events.
         trapped_events_df = hardware.construct_trapped_events_df()
@@ -45,6 +49,31 @@ class Simulation:
         tracks_df = trackbuilder.trackbuilder(bands_df)
         self.save_df(tracks_df, "trackbuilder_tracks_df")
 
+        # Mix the cyclotron frequencies down.
+        downmixed_tracks_df = downmixer.downmix(tracks_df)
+        self.save_df(downmixed_tracks_df, "downmixer_downmixed_tracks_df")
+
+        # Create a 2d array of bin powers.
+        spec_array = daq.construct_spec_array(downmixed_tracks_df)
+
+        # Write a spec file based on spec_array to the results_dir.
+        specbuilder.build_spec_file(spec_array)
+
+        return None
+
+    def run_daq(self, downmixed_tracks_df):
+        """TODO: DOCUMENT"""
+
+        # Initialize all necessary simulation blocks.
+        daq = sim_blocks.Daq(self.config)
+        specbuilder = sim_blocks.SpecBuilder(self.config)
+
+        # Create a 2d array of bin powers.
+        spec_array = daq.construct_spec_array(downmixed_tracks_df)
+
+        # Write a spec file based on spec_array to the results_dir.
+        specbuilder.build_spec_file(spec_array)
+
         return None
 
     def save_df(self, df, filename):
@@ -60,7 +89,6 @@ class Simulation:
             )
         )
         exists = os.path.isdir(results_dir)
-        # print(exists)
 
         # If folder doesn't exist, then create it.
         if not exists:

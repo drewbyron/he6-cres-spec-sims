@@ -12,10 +12,17 @@ import math
 
 import pandas as pd
 import numpy as np
+from numpy.random import default_rng
 
+from he6_cres_spec_sims.spec_tools.daq.frequency_domain_packet import FDpacket
 import he6_cres_spec_sims.spec_tools.spec_calc.spec_calc as sc
 import he6_cres_spec_sims.spec_tools.spec_calc.power_calc as pc
 from he6_cres_spec_sims.spec_tools.load_default_field_profiles import load_he6_trap
+
+
+# Configuration.
+
+rng = default_rng()
 
 # Math constants.
 
@@ -65,6 +72,9 @@ class Config:
                 self.kinematics = DotDict(config_dict["Kinematics"])
                 self.bandbuilder = DotDict(config_dict["BandBuilder"])
                 self.trackbuilder = DotDict(config_dict["TrackBuilder"])
+                self.downmixer = DotDict(config_dict["DownMixer"])
+                self.daq = DotDict(config_dict["Daq"])
+                self.specbuilder = DotDict(config_dict["SpecBuilder"])
 
         except Exception as e:
             print("Config file failed to load.")
@@ -98,7 +108,7 @@ class Physics:
 
         else:
             raise Exception(
-                "Exception: generate_monoenergetic_beta is the only configured setting."
+                "generate_monoenergetic_beta is the only configured setting."
             )
 
     def generate_monoenergetic_beta(self):
@@ -576,3 +586,293 @@ class TrackBuilder:
         )
 
         return tracks_df
+
+
+class DownMixer:
+    """TODO:Document"""
+
+    def __init__(self, config):
+
+        self.config = config
+
+    def downmix(self, tracks_df):
+        """TODO:Document"""
+
+        print("~~~~~~~~~~~~DownMixer Block~~~~~~~~~~~~~~\n")
+        print(
+            "DownMixing the cyclotron frequency with a {} GHz signal".format(
+                np.around(self.config.downmixer.mixer_freq * 1e-9, 4)
+            )
+        )
+        mixer_freq = self.config.downmixer.mixer_freq
+
+        downmixed_tracks_df = tracks_df.copy()
+        downmixed_tracks_df["freq_start"] = (
+            downmixed_tracks_df["freq_start"] - mixer_freq
+        )
+        downmixed_tracks_df["freq_stop"] = downmixed_tracks_df["freq_stop"] - mixer_freq
+
+        return downmixed_tracks_df
+
+
+class Daq:
+    """TODO:Document"""
+
+    def __init__(self, config):
+
+        self.config = config
+
+    def construct_spec_array(self, downmixed_tracks_df):
+        """TODO:Document"""
+        print("~~~~~~~~~~~~Daq Block~~~~~~~~~~~~~~\n")
+
+        # Allocate power in fW to each bin of the spec_array.
+        spec_array = self.allocate_powers_from_df(downmixed_tracks_df)
+
+        return spec_array
+
+    def allocate_powers_from_df(self, downmixed_tracks_df):
+        """TODO:Document"""
+
+        daq_freqbw = self.config.daq.daq_freqbw
+        freq_bins = self.config.daq.freq_bins
+        fft_per_slice = self.config.daq.fft_per_slice
+        run_length = self.config.trackbuilder.run_length
+
+        # Start by making the grid in freq and time
+        freq_per_bin = daq_freqbw / freq_bins
+
+        time_per_slice = fft_per_slice / freq_per_bin
+        time_slices = int(run_length / time_per_slice)
+
+        print("\nCreating a spec file with: {} slices: ".format(time_slices))
+
+        # Should be almost identical to run_length but a multiple of time_per_slice.
+        spec_time_stop = time_slices * time_per_slice
+
+        t_ticks = np.arange(0, spec_time_stop + 1 * time_per_slice, time_per_slice)
+        f_ticks = np.arange(0, daq_freqbw + 1 * freq_per_bin, freq_per_bin)
+
+        spec_array = np.zeros((time_slices, freq_bins))
+        print("\nCreating a spec_array with shape: ", spec_array.shape)
+
+        print(
+            "\nAllocating power to bins in spec_array for {} tracks.".format(
+                downmixed_tracks_df.shape[0]
+            )
+        )
+
+        # TODO: Would be better to use iterrows.
+        for i in range(downmixed_tracks_df.shape[0]):
+
+            time_start, freq_start = (
+                downmixed_tracks_df["time_start"][i],
+                downmixed_tracks_df["freq_start"][i],
+            )
+            time_stop, freq_stop = (
+                downmixed_tracks_df["time_stop"][i],
+                downmixed_tracks_df["freq_stop"][i],
+            )
+            t_intercepts = t_ticks[(t_ticks > time_start) & (t_ticks < time_stop)]
+            f_intercepts = f_ticks[(f_ticks > freq_start) & (f_ticks < freq_stop)]
+
+            # Find line equation.
+            m = (freq_stop - freq_start) / (time_stop - time_start)
+            b = freq_start - m * time_start
+
+            # Find list of x values for all grid intersections:
+            t_i = (f_intercepts - b) / m
+            f_i = t_intercepts * m + b
+
+            t_val_of_grid_intersections = np.concatenate(
+                (t_intercepts, t_i, np.asarray([time_start, time_stop]))
+            )
+            t_val_of_grid_intersections.sort()
+
+            f_val_of_grid_intersections = np.concatenate(
+                (f_intercepts, f_i, np.asarray([freq_start, freq_stop]))
+            )
+            f_val_of_grid_intersections.sort()
+
+            # Now find the midpoints of all the lines:
+            t_grid_indx = (
+                t_val_of_grid_intersections[:-1] + t_val_of_grid_intersections[1:]
+            ) / 2
+            f_grid_indx = (
+                f_val_of_grid_intersections[:-1] + f_val_of_grid_intersections[1:]
+            ) / 2
+
+            # Now find the indices of the effected cells:
+            t_grid_indx = (t_grid_indx / time_per_slice).astype("int") - 1
+            f_grid_indx = (f_grid_indx / freq_per_bin).astype("int") - 1
+
+            # Find the time portion of the line that traveled through the bin.
+            portion_of_tot_band_power = (
+                t_val_of_grid_intersections[1:] - t_val_of_grid_intersections[:-1]
+            ) / time_per_slice
+
+            # Multiply that portion by the power of that track.
+            if self.config.daq.band_power_override:
+                #                 print("band_power was overidden with value: ", self.config.daq.band_power_override)
+                band_power = self.config.daq.band_power_override
+            else:
+                band_power = downmixed_tracks_df["band_power"][i]
+
+            bin_power = portion_of_tot_band_power * band_power
+
+            # Drop indices that are out of the range of the spec file.
+            out_of_range_condition = (t_grid_indx < time_slices) & (
+                f_grid_indx < freq_bins
+            )
+
+            t_grid_indx = t_grid_indx[out_of_range_condition]
+            f_grid_indx = f_grid_indx[out_of_range_condition]
+            bin_power = bin_power[out_of_range_condition]
+
+            spec_array[t_grid_indx, f_grid_indx] += bin_power
+
+        # Now account for the frequency dependent gain.
+        if self.config.daq.gain_override:
+            print("gain was overidden with value: ", self.config.daq.gain_override)
+            gain = np.full(freq_bins, self.config.daq.gain_override)
+        else:
+            gain = self.get_measured_gain()
+
+        spec_array *= gain
+
+        # Now account for the freqency dependent noise.
+        noise_smooth_1d = self.get_measured_noise()
+        noise_array = self.construct_2d_noise_array(time_slices, noise_smooth_1d)
+
+        spec_array += noise_array
+
+        return spec_array
+
+    def get_measured_gain(self):
+        # Now how to open gain and noise:
+
+        results_dir = (
+            "{}/he6_cres_spec_sims/spec_tools/gain_noise_measurements/".format(
+                os.getcwd()
+            )
+        )
+        try:
+            gain_file_path = results_dir + "gain.csv"
+            gain = np.loadtxt(gain_file_path, delimiter=",")
+
+        except Exception as e:
+            print("Unable to open {}/gain.csv".format(results_dir))
+            raise e
+
+        return gain
+
+    def get_measured_noise(self):
+        # Now how to open gain and noise:
+
+        results_dir = (
+            "{}/he6_cres_spec_sims/spec_tools/gain_noise_measurements/".format(
+                os.getcwd()
+            )
+        )
+        try:
+            noise_file_path = results_dir + "noise.csv"
+            noise_smooth_1d = np.loadtxt(noise_file_path, delimiter=",")
+
+        except Exception as e:
+            print("Unable to open {}/gain.csv".format(results_dir))
+            raise e
+
+        return noise_smooth_1d
+
+    def construct_2d_noise_array(self, time_slices, noise_smooth_1d):
+
+        # With chisq dist DOF = 4:
+        DOF = 4
+        noise_array = np.array(
+            [rng.chisquare(DOF, time_slices) * mu / DOF for mu in noise_smooth_1d]
+        ).T
+        return noise_array
+
+
+class SpecBuilder:
+    """TODO:Document"""
+
+    def __init__(self, config):
+
+        self.config = config
+
+    def build_spec_file(self, spec_array):
+        """TODO:Document"""
+        print("~~~~~~~~~~~~SpecBuilder Block~~~~~~~~~~~~~~\n")
+
+        # Grab the headers for the 4 differnt packets that make up the  (0,1,2,3).
+        # TODO: Think of a more elegant way of getting the headers. Opening this file is clunky...
+        hdr_list = self.get_headers()
+
+        # Make spec file:
+        slices_in_spec = spec_array.shape[0]
+        freq_bins = self.config.daq.freq_bins
+        freq_bins_per_packet = freq_bins / 4
+
+        specfile_name = self.config.specbuilder.specfile_name
+        results_dir = "{}/he6_cres_spec_sims/simulation_results/{}/spec_files".format(
+            os.getcwd(), self.config.simulation.results_dir
+        )
+
+        exists = os.path.isdir(results_dir)
+
+        # If folder doesn't exist, then create it.
+        if not exists:
+            os.makedirs(results_dir)
+            print("created folder : ", results_dir)
+
+        spec_path = "{}/{}.spec".format(results_dir, specfile_name)
+
+        # Pass "wb" to write a binary file
+        with open(spec_path, "wb") as spec_file:
+
+            # Loop over slices in spec file
+            for a in range(slices_in_spec * 4):
+
+                packet_num = a % 4
+                slice_num = a // 4
+
+                # Write data to out_file
+                data = spec_array[slice_num][
+                    int(packet_num * freq_bins_per_packet) : int(
+                        (packet_num + 1) * freq_bins_per_packet
+                    )
+                ]
+                data = data.astype("uint8")
+                # Write appropriate header to spec_file.
+                spec_file.write(hdr_list[packet_num])
+                # Write data to spec_file.
+                data.tofile(spec_file)
+
+    def get_headers(self):
+
+        path = os.getcwd()
+        spec_file_to_grab_headers = (
+            path
+            + "/he6_cres_spec_sims/spec_tools/roach_noise/Freq_data_2021-04-30-13-14-18.spec"
+        )
+
+        # open file:
+        hdr_list = []
+        try:
+            with open(spec_file_to_grab_headers, "rb") as in_file:
+                print("Opened roach_noise file.")
+                for m in range(4):
+                    hdr = in_file.read(FDpacket.BYTES_IN_HEADER)
+                    hdr_list.append(hdr)
+                    data = in_file.read(FDpacket.BYTES_IN_PAYLOAD)
+
+        except Exception as e:
+            print(
+                "Do you have a roach noise file at {} ?".format(
+                    spec_file_to_grab_headers
+                )
+            )
+            raise e
+
+        return hdr_list

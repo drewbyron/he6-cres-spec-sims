@@ -3,7 +3,6 @@
 import os
 
 import matplotlib.pyplot as plt
-
 import numpy as np
 import pandas as pd
 
@@ -12,10 +11,6 @@ from he6_cres_spec_sims import simulation_blocks as sim_blocks
 # Plt settings:
 plt.rcParams["figure.dpi"] = 220
 plt.rcParams.update({"font.size": 10})
-
-# Pandas settings.
-pd.set_option('display.max_rows', 100)
-pd.set_option('display.max_columns', 100)
 
 
 def read_saved_df(config, filename):
