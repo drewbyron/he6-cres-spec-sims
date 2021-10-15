@@ -5,7 +5,7 @@
     },    
 
     "Physics" : {
-        "events_to_simulate" : 10, 
+        "events_to_simulate" : 2, 
         "monoenergetic" : true,
         "energy" : 17.8e3, 
         "min_rho" : 0,
@@ -27,11 +27,11 @@
         "jump_size_eV" : 14,
         "jump_std_eV" : 5,
         "pitch_angle_costheta_std" : 0.00,
-        "jump_num_max" : 0
+        "jump_num_max" : 2
     },
 
     "BandBuilder" : {
-        "sideband_num": 0,
+        "sideband_num": 3,
         "frac_total_segment_power_cut" : 0.0 
 
     },
@@ -49,11 +49,12 @@
         "freq_bins" : 32768,
         "fft_per_slice" : 2,
         "band_power_override" : 1e-16,
-        "gain_override" : 25e16
+        "gain_override" : 1
     },
 
     "SpecBuilder" : {
-        "noisefile_name" : "Freq_data_2021-04-30-13-14-18.spec"
+        "specfile_name" : "example_spec_file"
+
     }  
 
 }

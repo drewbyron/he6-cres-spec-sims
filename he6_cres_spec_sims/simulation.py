@@ -1,13 +1,34 @@
-""" TODO: DOCUMENT
+""" simulation
+
+This module contains a single class (Simulation) that links the 
+simulation blocks together. One can use the method run_full() to 
+simulate tracks as well as run those tracks through the DAQ, creating a
+.spec file. Or one can take a set of downmixed tracks previously created
+by  run_full() and saved to a .csv and run them through the DAQ, as it
+is the calculation of the track properties (axial_freq, z_max,...) that
+take the most time. 
+
+
+The general approach is that pandas dataframes, each row describing a
+single CRES data object (event, segment,  band, or track), are passed
+between the blocks, each block adding complexity to the simulation. This
+general structure is broken by the last two classes (Daq and
+SpecBuilder), which are responsible for creating the .spec (binary) file
+output. This .spec file can then be fed into Katydid just as real data
+would be.
+
+Classes contained in module: 
+
+    * Simulation
+
 """
 
-
-import os
 import json
 import math
+import os
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 import he6_cres_spec_sims.spec_tools.spec_calc.spec_calc as sc
 from he6_cres_spec_sims.spec_tools.load_default_field_profiles import load_he6_trap
@@ -101,4 +122,4 @@ class Simulation:
             print("Unable to open df.")
             raise e
 
-        return 0
+        return None

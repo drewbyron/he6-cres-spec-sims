@@ -8,7 +8,9 @@ import he6_cres_spec_sims.spec_tools.spec_calc.spec_calc as sc
 
 def rho_phi(center_x, center_y, time, frequency, field):
     """
-    Calculates cylindrical rho and phi positional coordinates of electron undergoing cyclotron motion with center of cyclotron orbit at (center_x, center_y) with frequency in Hz and field in Tesla as a function of time in seconds.
+    Calculates cylindrical rho and phi positional coordinates of electron undergoing 
+    cyclotron motion with center of cyclotron orbit at (center_x, center_y) with 
+    frequency in Hz and field in Tesla as a function of time in seconds.
     """
     cyc_rad = sc.cyc_radius(sc.freq_to_energy(frequency, field), field, 90)
     omega = 2 * math.pi * frequency
@@ -106,12 +108,12 @@ def fA_fB_integral_sum(center_x, center_y, frequency, field, trap_radius=0.578e-
     return fA_fB_integral_complete
 
 
-def power_calc_not_vect(center_x, center_y, frequency, field, trap_radius=0.578e-2):
+def power_calc_not_vect(center_x, center_y, frequency, field, trap_radius):
 
-    """Calculates the average cyclotron radiation power in Watts in the
+    """Calculates the average cyclotron radiation power (in one direction) in Watts in the
     TE11 mode of an electron undergoing cyclotron motion in the
     cylindrical waveguide around the point (center_x,center_y) with
-    frequency in Hz and field in Tesla.
+    frequency in Hz and field in Tesla. 
     """
 
     q = 1.602176634e-19  # Electron charge, in Coulombs
@@ -121,7 +123,7 @@ def power_calc_not_vect(center_x, center_y, frequency, field, trap_radius=0.578e
 
     kc = p11prime / trap_radius
     Rcycl = sc.cyc_radius(sc.freq_to_energy(frequency, field), field, 90)
-
+    
     if Rcycl > trap_radius:
         print("Warning: cyclotron radius greater than trap radius")
 
@@ -148,10 +150,10 @@ def power_calc_not_vect(center_x, center_y, frequency, field, trap_radius=0.578e
 
     return power
 
-def power_calc(center_x, center_y, frequency, field, trap_radius=0.578e-2):
+def power_calc(center_x, center_y, frequency, field, trap_radius):
 
     """Vectorized version of power_calc_not_vect function."""
 
     power_calc_vect = np.vectorize(power_calc_not_vect)
 
-    return power_calc_vect(center_x, center_y, frequency, field, trap_radius=0.578e-2)
+    return power_calc_vect(center_x, center_y, frequency, field, trap_radius)

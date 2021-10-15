@@ -1,26 +1,53 @@
-""" TODO: DOCUMENT
+""" simulation_blocks
 
-Notes: 
-* Get rid of field_strength. Just replace with field_strength_interp.
-* Write the field grid to JSON so that it's much faster and more precise.
+This module contains all of the simulation "blocks" used by the 
+Simulation class (see simulation.py). Each block simulates the action of
+a concrete part of the pipeline from beta creation to a .spec file being
+ written to disk by the ROACH DAQ. The module also contains the Config
+class that reads the JSON config file and holds all of the configurable
+parameters as well as the field profile. An instance of  the Config
+class linked to a specific JSON config file is passed to each simulation
+block.
+
+
+The general approach is that pandas dataframes, each row describing a
+single CRES data object (event, segment,  band, or track), are passed between
+the blocks, each block adding complexity to the simulation. This general
+structure is broken by the last two  classes (Daq and SpecBuilder),
+which are responsible for creating the .spec (binary) file output. This
+.spec file can then be fed into Katydid just as real data would be.
+
+Classes contained in module: 
+
+    * DotDict
+    * Config
+    * Physics
+    * Hardware
+    * Kinematics
+    * BandBuilder
+    * TrackBuilder
+    * DownMixer
+    * Daq
+    * SpecBuilder
+
 """
 
-
-import os
 import json
 import math
+import os
 
-import pandas as pd
 import numpy as np
 from numpy.random import default_rng
+import pandas as pd
+import matplotlib.pyplot as plt
 
-from he6_cres_spec_sims.spec_tools.daq.frequency_domain_packet import FDpacket
+from he6_cres_spec_sims.daq.frequency_domain_packet import FDpacket
+from he6_cres_spec_sims.spec_tools.load_default_field_profiles import load_he6_trap
 import he6_cres_spec_sims.spec_tools.spec_calc.spec_calc as sc
 import he6_cres_spec_sims.spec_tools.spec_calc.power_calc as pc
-from he6_cres_spec_sims.spec_tools.load_default_field_profiles import load_he6_trap
 
 
-# Configuration.
+# TODO: Make the seed a config parameter, and pass rng(seed) around.
 
 rng = default_rng()
 
@@ -35,12 +62,12 @@ P11_PRIME = 1.84118  # First zero of J1 prime (bessel function)
 ME = 5.10998950e5  # Electron rest mass (eV).
 M = 9.1093837015e-31  # Electron rest mass (kg).
 Q = 1.602176634e-19  # Electron charge (Coulombs).
-C = 299792458  # Speed of light in vacuum, in m/s
+C = 299792458  # Speed of light in vacuum (m/s)
 J_TO_EV = 6.241509074e18  # Joule-ev conversion
 
 
 class DotDict(dict):
-    """Utility class. dot.notation access to dictionary attributes."""
+    """Provides dot.notation access to dictionary attributes."""
 
     __getattr__ = dict.get
     __setattr__ = dict.__setitem__
@@ -48,15 +75,67 @@ class DotDict(dict):
 
 
 class Config:
-    """TODO: DOCUMENT"""
+    """A class used to contain the field map and configurable parameters
+    associated with a given simulation configuration file (for example:
+    config_example.json).  
 
-    def __init__(self, config_filename="config_example"):
+    ...
 
+    Attributes
+    ----------  
+    simulation, physics, hardware, ... : DotDict
+        A dictionary containing the configurable parameters associated 
+        with a given simulation block. The parameters can be accessed
+        with dot.notation. For example hardware.main_field would
+        return a field value in T. 
+
+    trap_profile: Trap_profile
+        An instance of a Trap_profile that corresponds to the main_field
+        and trap_strength specified in the config file. Many of the 
+        spec_tool.spec_calc functions take the trap_profile as a 
+        parameter. 
+        
+    field_strength: Trap_profile instance method
+        Quick access to field strength values. field_strength(rho,z)=
+        field magnitude in T at position (rho,z). Note that there is no 
+        field variation in phi. num_legs : int The number of legs the
+        animal has (default 4).
+
+    Methods
+    -------
+    load_config_file(config_filename)
+        Loads the config file. 
+
+    load_field_profile()
+        Loads the field profile. 
+    """
+
+    def __init__(self, config_filename):
+        """
+        Parameters
+        ----------
+        config_filename: str
+            The name of the config file contained in the
+            he6_cres_spec_sims/config_files directory.
+        """
         self.load_config_file(config_filename)
         self.load_field_profile()
 
     def load_config_file(self, config_filename):
-        """TODO: DOCUMENT"""
+        """Loads the JSON config file and creates attributes associated 
+        with all configurable parameters.
+
+        Parameters
+        ----------
+        config_filename: str
+            The name of the config file contained in the
+            he6_cres_spec_sims/config_files directory.
+
+        Raises
+        ------
+        Exception
+            If config file isn't found or can't be opened.
+        """
 
         filepath = "{}/he6_cres_spec_sims/config_files/{}.json".format(
             os.getcwd(), config_filename
@@ -81,7 +160,20 @@ class Config:
             raise e
 
     def load_field_profile(self):
-        """TODO: DOCUMENT"""
+        """Uses the he6 trap geometry (2021), specified in the
+        load_he6_trap module, and the main_field and trap strength
+        specified in the config file to create an instance of
+        Trap_profile.
+
+        Parameters
+        ----------
+        None
+
+        Raises
+        ------
+        Exception
+            If field profile fails to load. 
+        """
 
         try:
             main_field = self.hardware.main_field
@@ -107,9 +199,8 @@ class Physics:
             return self.generate_monoenergetic_beta()
 
         else:
-            raise Exception(
-                "generate_monoenergetic_beta is the only configured setting."
-            )
+            raise NotImplementedError("Only monoenergetic betas have been implemented.")
+
 
     def generate_monoenergetic_beta(self):
         return self.config.physics.energy
@@ -334,6 +425,10 @@ class Kinematics:
                 # Second, calculate new pitch angle and energy.
                 # New Pitch Angle:
                 center_theta = center_theta + delta_center_theta
+
+                # Solving an issue caused by pitch angles larger than 90.
+                if center_theta > 90:
+                    center_theta = 180 - center_theta
 
                 # New energy:
                 energy = energy_stop - jump_size_eV
@@ -645,8 +740,6 @@ class Daq:
         time_per_slice = fft_per_slice / freq_per_bin
         time_slices = int(run_length / time_per_slice)
 
-        print("\nCreating a spec file with: {} slices: ".format(time_slices))
-
         # Should be almost identical to run_length but a multiple of time_per_slice.
         spec_time_stop = time_slices * time_per_slice
 
@@ -654,7 +747,7 @@ class Daq:
         f_ticks = np.arange(0, daq_freqbw + 1 * freq_per_bin, freq_per_bin)
 
         spec_array = np.zeros((time_slices, freq_bins))
-        print("\nCreating a spec_array with shape: ", spec_array.shape)
+        print("Creating a spec_array with shape: ", spec_array.shape)
 
         print(
             "\nAllocating power to bins in spec_array for {} tracks.".format(
@@ -663,15 +756,16 @@ class Daq:
         )
 
         # TODO: Would be better to use iterrows.
-        for i in range(downmixed_tracks_df.shape[0]):
+        for i, dm_track in downmixed_tracks_df.iterrows():
+            # for i in range(downmixed_tracks_df.shape[0]):
 
             time_start, freq_start = (
-                downmixed_tracks_df["time_start"][i],
-                downmixed_tracks_df["freq_start"][i],
+                dm_track["time_start"],
+                dm_track["freq_start"],
             )
             time_stop, freq_stop = (
-                downmixed_tracks_df["time_stop"][i],
-                downmixed_tracks_df["freq_stop"][i],
+                dm_track["time_stop"],
+                dm_track["freq_stop"],
             )
             t_intercepts = t_ticks[(t_ticks > time_start) & (t_ticks < time_stop)]
             f_intercepts = f_ticks[(f_ticks > freq_start) & (f_ticks < freq_stop)]
@@ -702,10 +796,14 @@ class Daq:
                 f_val_of_grid_intersections[:-1] + f_val_of_grid_intersections[1:]
             ) / 2
 
-            # Now find the indices of the effected cells:
-            t_grid_indx = (t_grid_indx / time_per_slice).astype("int") - 1
-            f_grid_indx = (f_grid_indx / freq_per_bin).astype("int") - 1
+            # # Now find the indices of the effected cells:
+            # t_grid_indx = (t_grid_indx / time_per_slice).astype("int") - 1
+            # f_grid_indx = (f_grid_indx / freq_per_bin).astype("int") - 1
 
+            # TODO: RESTORE THIS!
+            # Now find the indices of the effected cells. I don't think a minus 1 is necessary here.
+            t_grid_indx = (t_grid_indx / time_per_slice).astype("int")
+            f_grid_indx = (f_grid_indx / freq_per_bin).astype("int")
             # Find the time portion of the line that traveled through the bin.
             portion_of_tot_band_power = (
                 t_val_of_grid_intersections[1:] - t_val_of_grid_intersections[:-1]
@@ -716,7 +814,7 @@ class Daq:
                 #                 print("band_power was overidden with value: ", self.config.daq.band_power_override)
                 band_power = self.config.daq.band_power_override
             else:
-                band_power = downmixed_tracks_df["band_power"][i]
+                band_power = dm_track["band_power"]
 
             bin_power = portion_of_tot_band_power * band_power
 
@@ -733,12 +831,31 @@ class Daq:
 
         # Now account for the frequency dependent gain.
         if self.config.daq.gain_override:
-            print("gain was overidden with value: ", self.config.daq.gain_override)
+            print(
+                "\nGain was overidden with value: {} \n".format(
+                    self.config.daq.gain_override
+                )
+            )
             gain = np.full(freq_bins, self.config.daq.gain_override)
         else:
             gain = self.get_measured_gain()
 
         spec_array *= gain
+
+        # # TODO: DELETE ONCE THIS WORKS:
+
+        # fig, ax = plt.subplots(1, 1, figsize = (14,7))
+        # ax.plot(np.nonzero(spec_array)[0]*time_per_slice, np.nonzero(spec_array)[1]*freq_per_bin, "bo", alpha = .5)
+        # for index, track in downmixed_tracks_df.iterrows():
+
+        #     TimeCoordinates = (track["time_start"],track["time_stop"])
+        #     FreqCoordinates = (track["freq_start"],track["freq_stop"])
+        #     ax.plot(TimeCoordinates, FreqCoordinates, 'ro-',markersize=.5,alpha = .5)
+
+        # plt.xlabel("Time (s)")
+        # plt.ylabel("Freq (Hz)")
+        # plt.title("Visualization of power allocation to spec_array")
+        # plt.show()
 
         # Now account for the freqency dependent noise.
         noise_smooth_1d = self.get_measured_noise()
@@ -751,10 +868,8 @@ class Daq:
     def get_measured_gain(self):
         # Now how to open gain and noise:
 
-        results_dir = (
-            "{}/he6_cres_spec_sims/spec_tools/gain_noise_measurements/".format(
-                os.getcwd()
-            )
+        results_dir = "{}/he6_cres_spec_sims/daq/gain_noise_measurements/".format(
+            os.getcwd()
         )
         try:
             gain_file_path = results_dir + "gain.csv"
@@ -769,17 +884,15 @@ class Daq:
     def get_measured_noise(self):
         # Now how to open gain and noise:
 
-        results_dir = (
-            "{}/he6_cres_spec_sims/spec_tools/gain_noise_measurements/".format(
-                os.getcwd()
-            )
+        results_dir = "{}/he6_cres_spec_sims/daq/gain_noise_measurements/".format(
+            os.getcwd()
         )
         try:
             noise_file_path = results_dir + "noise.csv"
             noise_smooth_1d = np.loadtxt(noise_file_path, delimiter=",")
 
         except Exception as e:
-            print("Unable to open {}/gain.csv".format(results_dir))
+            print("Unable to open {}/noise.csv".format(results_dir))
             raise e
 
         return noise_smooth_1d
@@ -791,6 +904,11 @@ class Daq:
         noise_array = np.array(
             [rng.chisquare(DOF, time_slices) * mu / DOF for mu in noise_smooth_1d]
         ).T
+
+        # Recently (10/07/2021) discovered that letting "dtype = uint8"
+        # do the rounding is not working well.
+        noise_array = np.around(noise_array, 0)
+
         return noise_array
 
 
@@ -849,19 +967,23 @@ class SpecBuilder:
                 # Write data to spec_file.
                 data.tofile(spec_file)
 
+        print("\n**Block Output:**")
+        print("Successfully wrote a spec file to {} \n".format(spec_path))
+
+        return None
+
     def get_headers(self):
 
         path = os.getcwd()
         spec_file_to_grab_headers = (
             path
-            + "/he6_cres_spec_sims/spec_tools/roach_noise/Freq_data_2021-04-30-13-14-18.spec"
+            + "/he6_cres_spec_sims/daq/roach_noise/Freq_data_2021-04-30-13-14-18.spec"
         )
 
         # open file:
         hdr_list = []
         try:
             with open(spec_file_to_grab_headers, "rb") as in_file:
-                print("Opened roach_noise file.")
                 for m in range(4):
                     hdr = in_file.read(FDpacket.BYTES_IN_HEADER)
                     hdr_list.append(hdr)

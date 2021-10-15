@@ -1,19 +1,19 @@
 {
 
     "Simulation" : {
-        "results_dir" : "config_example_dfs"
+        "results_dir" : "sim_tests"
     },    
    
 
     "Physics" : {
-        "events_to_simulate" : 2, 
+        "events_to_simulate" : 100, 
         "monoenergetic" : true,
-        "energy" : 17.8e3, 
+        "energy" : 30.472e3, 
         "min_rho" : 0,
         "max_rho" : 5.78e-3,
         "min_z" : -5e-3,
         "max_z" : 5e-3,
-        "min_theta" : 85,
+        "min_theta" : 90,
         "max_theta" : 90
     },
 
@@ -29,20 +29,19 @@
         "jump_size_eV" : 0,
         "jump_std_eV" : 0,
         "pitch_angle_costheta_std" : 0.00,
-        "jump_num_max" : 3
+        "jump_num_max" : 0
     },
 
     "BandBuilder" : {
-        "sideband_num": 2,
+        "sideband_num": 0,
         "frac_total_segment_power_cut" : 0.0 
 
     },
 
     "TrackBuilder" : {
-        "run_length" : 0.5, 
-        "decay_rate" : 1e3
+        "run_length" : 0.05
     },
-    
+
     "DownMixer" : {
         "mixer_freq" : 17.9e9
     },    
@@ -52,15 +51,14 @@
         "freq_bins" : 32768,
         "fft_per_slice" : 2,
         "band_power_override" : 1e-16,
-        "gain_override" : 1
+        "gain_override" : 25e16
     },
 
     "SpecBuilder" : {
-        "specfile_name" : "example_spec_file"
+        "specfile_name" : "test_simple_0"
 
     }  
 
 }
-
 
 
