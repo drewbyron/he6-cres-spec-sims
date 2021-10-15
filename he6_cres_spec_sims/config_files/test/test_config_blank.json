@@ -38,11 +38,28 @@
 
     },
 
-    "TrackBuilder" : {
-        "run_length" : 0.5
-    }
 
+    "TrackBuilder" : {
+        "run_length" : 0, 
+        "decay_rate" : 0
+    },
     
+    "DownMixer" : {
+        "mixer_freq" : 0
+    },    
+
+    "Daq" : {
+        "daq_freqbw" : 0,
+        "freq_bins" : 0,
+        "fft_per_slice" : 0,
+        "band_power_override" : 0,
+        "gain_override" : 0
+    },
+
+    "SpecBuilder" : {
+        "specfile_name" : "example_spec_file"
+
+    }  
 
 }
 

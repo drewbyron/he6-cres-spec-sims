@@ -143,13 +143,13 @@ def load_main_magnet(main_field=1):
 
     return field_profile
     
-def load_he6_coils(main_field,trap_strength=1e-3):
+def load_he6_coils(main_field =0 ,trap_strength = 1e-3):
 
     #He6-CRES three-coil trap
     center_windings = 88 / (4.84e-3 * 2)
     edge_windings = 44 / (4.84e-3 * 2)
     current_per_wire = (0.24687194322084335 / 1e-3) * trap_strength * main_field
-    
+    print("coil current", current_per_wire, "A")
 
     center_coil = Coil_form(1.15e-2,1.35e-2,-4.84e-3,4.84e-3,0,center_windings,-current_per_wire,"center coil")
 
@@ -158,13 +158,13 @@ def load_he6_coils(main_field,trap_strength=1e-3):
 
     triple_field_profile = Field_profile([center_coil,
                                 left_edge_coil,
-                                right_edge_coil], trap_strength=1e-3)
+                                right_edge_coil], main_field,trap_strength)
                                 
     return triple_field_profile
     
 def load_he6_trap(main_field=1,trap_strength=1e-3):
 
     coil_list = load_he6_coils(main_field,trap_strength).get_coil_list()
-    trap_profile = Trap_profile(coil_list,main_field)
+    trap_profile = Trap_profile(coil_list,main_field, trap_strength)
     
     return trap_profile

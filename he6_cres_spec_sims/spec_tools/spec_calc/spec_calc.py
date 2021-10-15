@@ -98,6 +98,17 @@ def freq_to_energy(frequency, field):
     return gamma * ME - ME
 
 
+def energy_and_freq_to_field(energy, freq):
+
+    """Converts kinetic energy to cyclotron frequency."""
+
+    # cycl_freq = Q * field / (2 * PI * gamma(energy) * M)
+
+    field = (2 * PI * gamma(energy) * M*freq )/Q
+
+    return field
+
+
 def random_beta_generator(parameter_dict):
 
     """TODO(byron): Think about if the phi_initial parameter has an
@@ -117,7 +128,9 @@ def random_beta_generator(parameter_dict):
     min_theta = parameter_dict["min_theta"] / RAD_TO_DEG
     max_theta = parameter_dict["max_theta"] / RAD_TO_DEG
 
-    rho_initial = np.sqrt(uniform(0, 1) * (max_rho ** 2 - min_rho ** 2))
+    # TODO: Explain this in words. Had to change this 10122021 because 
+    # it only worked if min_rho was zero.
+    rho_initial = min_rho + np.sqrt(uniform(0, 1) * (max_rho ** 2 - min_rho ** 2))
     phi_initial = 2 * PI * uniform(0, 1) * RAD_TO_DEG
     # phi_initial = 0
     z_initial = uniform(min_z, max_z)
@@ -229,7 +242,7 @@ def max_zpos_not_vectorized(center_pitch_angle, rho, trap_profile, debug=False):
     if trap_profile.is_trap:
 
         if center_pitch_angle < min_theta(rho, 0, trap_profile):
-            print("WARNING: Electron not trapped")
+            print("WARNING: Electron not trapped (zpos)")
             return False
 
         else:
@@ -399,7 +412,7 @@ def avg_cycl_freq_not_vect(energy, center_pitch_angle, rho, trap_profile):
         min_trapped_angle = min_theta(rho, 0, trap_profile)
 
         if center_pitch_angle < min_trapped_angle:
-            print("Warning: electron not trapped")
+            print("Warning: (avg_cyc) electron not trapped.")
             return False
 
         if center_pitch_angle == 90.0:

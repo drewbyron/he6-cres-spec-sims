@@ -22,10 +22,10 @@ class Trap_profile(Field_profile):
     #@property main_field(self), main_field(self,value)
     
     
-    def __init__(self,list_coils,main_field=0,field_scales=True):
+    def __init__(self,list_coils,main_field=0,trap_strength=1e-3, field_scales=True):
     
         
-        super().__init__(list_coils,main_field)
+        super().__init__(list_coils,main_field, trap_strength)
         self._field_scales = field_scales
         
         if not main_field > 0:

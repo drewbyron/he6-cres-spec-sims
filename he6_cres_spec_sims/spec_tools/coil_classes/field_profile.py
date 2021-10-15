@@ -13,7 +13,7 @@ class Field_profile:
     Generates object that calculates field strength of set of coaxial solenoidal coils.
     """
 
-    def __init__(self, list_coils, main_field=0, trap_strength=1e-3, interp=True):
+    def __init__(self, list_coils, main_field=0, trap_strength =1e-3,  interp=True):
 
         self.trap_strength = trap_strength
         self._list_coils = list_coils
@@ -24,14 +24,8 @@ class Field_profile:
 
         self._z_offset = 0
 
-        if interp and main_field != 0:
+        if interp:
             self.initialize_field_strength_interp()
-        # self.field_strength_interpolated_function = None
-
-        # if interp:
-        #     self.field_strength_interpolated_function = (
-        #         self.initialize_field_strength_interp()
-        #     )
 
         for coil in list_coils:
 
