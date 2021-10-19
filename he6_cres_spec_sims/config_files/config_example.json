@@ -17,7 +17,7 @@
     },
 
     "Hardware" : {
-        "main_field" : 0.689,
+        "main_field" : 1.0,
         "trap_strength" : 1e-3,
         "decay_cell_radius" : 5.78e-3
     },

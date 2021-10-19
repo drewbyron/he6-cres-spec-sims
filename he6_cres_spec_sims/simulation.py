@@ -27,6 +27,7 @@ import json
 import math
 import os
 
+from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
@@ -38,62 +39,55 @@ from he6_cres_spec_sims import simulation_blocks as sim_blocks
 class Simulation:
     """TODO: DOCUMENT"""
 
-    def __init__(self, config):
+    def __init__(self, config_path):
 
-        self.config = config
+        self.config_path = config_path
+        self.config = sim_blocks.Config(config_path)
 
     def run_full(self):
         """TODO: DOCUMENT"""
 
         # Initialize all simulation blocks.
-        hardware = sim_blocks.Hardware(self.config)
-        kinematics = sim_blocks.Kinematics(self.config)
+        eventbuilder = sim_blocks.EventBuilder(self.config)
+        segmentbuilder = sim_blocks.SegmentBuilder(self.config)
         bandbuilder = sim_blocks.BandBuilder(self.config)
         trackbuilder = sim_blocks.TrackBuilder(self.config)
-        downmixer = sim_blocks.DownMixer(self.config)
+        dmtrackbuilder = sim_blocks.DMTrackBuilder(self.config)
         daq = sim_blocks.Daq(self.config)
-        specbuilder = sim_blocks.SpecBuilder(self.config)
+        specbuilder = sim_blocks.SpecBuilder(self.config, self.config_path)
 
-        # Create a set of trapped events.
-        trapped_events_df = hardware.construct_trapped_events_df()
-        self.save_df(trapped_events_df, "hardware_trapped_events_df")
 
-        # Scatter the trapped events, creating segments.
-        segments_df = kinematics.scatter(trapped_events_df)
-        self.save_df(segments_df, "kinematics_segments_df")
+        events = eventbuilder.run()
+        segments = segmentbuilder.run(events)
+        bands = bandbuilder.run(segments)
+        tracks = trackbuilder.run(bands)
+        dmtracks = dmtrackbuilder.run(tracks)
+        spec_array = daq.run(dmtracks)
+        specbuilder.run(spec_array)
 
-        # Build out the bands of the segments.
-        bands_df = bandbuilder.bandbuilder(segments_df)
-        self.save_df(bands_df, "bandbuilder_bands_df")
-
-        # Add event start times and drop columns, creating tracks.
-        tracks_df = trackbuilder.trackbuilder(bands_df)
-        self.save_df(tracks_df, "trackbuilder_tracks_df")
-
-        # Mix the cyclotron frequencies down.
-        downmixed_tracks_df = downmixer.downmix(tracks_df)
-        self.save_df(downmixed_tracks_df, "downmixer_downmixed_tracks_df")
-
-        # Create a 2d array of bin powers.
-        spec_array = daq.construct_spec_array(downmixed_tracks_df)
-
-        # Write a spec file based on spec_array to the results_dir.
-        specbuilder.build_spec_file(spec_array)
+        # Save the results of the simulation:
+        results = Results(events, segments, bands, tracks, dmtracks)
+        results.save(self.config_path)
 
         return None
 
-    def run_daq(self, downmixed_tracks_df):
-        """TODO: DOCUMENT"""
+    def run_daq(self):
+        """TODO: Document"""
+
+        # Load existing data using Results class.
+        try:
+            results = Results.load(self.config_path)
+        except Exception as e:
+            print("You don't have results to run the daq on.")
+            raise e
 
         # Initialize all necessary simulation blocks.
         daq = sim_blocks.Daq(self.config)
-        specbuilder = sim_blocks.SpecBuilder(self.config)
+        specbuilder = sim_blocks.SpecBuilder(self.config, self.config_path)
 
-        # Create a 2d array of bin powers.
-        spec_array = daq.construct_spec_array(downmixed_tracks_df)
-
-        # Write a spec file based on spec_array to the results_dir.
-        specbuilder.build_spec_file(spec_array)
+        # Simulate the action of the Daq on the loaded dmtracks.
+        spec_array = daq.run(results.dmtracks)
+        specbuilder.run(spec_array)
 
         return None
 
@@ -123,3 +117,81 @@ class Simulation:
             raise e
 
         return None
+
+
+@dataclass
+class Results:
+
+    events: pd.DataFrame
+    segments: pd.DataFrame
+    bands: pd.DataFrame
+    tracks: pd.DataFrame
+    dmtracks: pd.DataFrame
+
+    def save(self, config_path):
+        results_dict = {
+            "events": self.events,
+            "segments": self.segments,
+            "bands": self.bands,
+            "tracks": self.tracks,
+            "dmtracks": self.dmtracks,
+        }
+
+        # First make a results_dir with the same name as the config.
+        config_name = config_path.stem
+        parent_dir = config_path.parents[0]
+        results_dir = parent_dir / config_name
+
+        exists = results_dir.is_dir()
+
+        # If results_dir doesn't exist, then create it.
+        if not exists:
+            results_dir.mkdir()
+            print("created directory : ", results_dir)
+
+        # Now write the results to results_dir:
+        for data_name, data in results_dict.items():
+            #             print(data_name, data)
+
+            try:
+                data.to_csv(results_dir / "{}.csv".format(data_name))
+            except Exception as e:
+                print("Unable to write {} data.".format(data_name))
+                raise e
+
+    @classmethod
+    def load(cls, config_path):
+        results_dict = {
+            "events": None,
+            "segments": None,
+            "bands": None,
+            "tracks": None,
+            "dmtracks": None,
+        }
+        # Load results.
+        # First make a results directory with the same name as the config.
+        config_name = config_path.stem
+        parent_dir = config_path.parents[0]
+        results_dir = parent_dir / "{}".format(config_name)
+
+        for data_name, data in results_dict.items():
+
+            try:
+                df = pd.read_csv(
+                    results_dir / "{}.csv".format(data_name), index_col=[0]
+                )
+                results_dict[data_name] = df
+
+            except Exception as e:
+                print("Unable to load {} data.".format(data_name))
+                raise e
+
+        results = cls(
+            results_dict["events"],
+            results_dict["segments"],
+            results_dict["bands"],
+            results_dict["tracks"],
+            results_dict["dmtracks"],
+        )
+
+        return results

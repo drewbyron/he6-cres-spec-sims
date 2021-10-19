@@ -22,11 +22,11 @@ Classes contained in module:
     * DotDict
     * Config
     * Physics
-    * Hardware
-    * Kinematics
+    * EventBuilder
+    * SegmentBuilder
     * BandBuilder
     * TrackBuilder
-    * DownMixer
+    * DMTrackBuilder
     * Daq
     * SpecBuilder
 
@@ -35,6 +35,7 @@ Classes contained in module:
 import json
 import math
 import os
+import yaml
 
 import numpy as np
 from numpy.random import default_rng
@@ -77,40 +78,40 @@ class DotDict(dict):
 class Config:
     """A class used to contain the field map and configurable parameters
     associated with a given simulation configuration file (for example:
-    config_example.json).  
+    config_example.json).
 
     ...
 
     Attributes
-    ----------  
-    simulation, physics, hardware, ... : DotDict
-        A dictionary containing the configurable parameters associated 
+    ----------
+    simulation, physics, eventbuilder, ... : DotDict
+        A dictionary containing the configurable parameters associated
         with a given simulation block. The parameters can be accessed
-        with dot.notation. For example hardware.main_field would
-        return a field value in T. 
+        with dot.notation. For example eventbuilder.main_field would
+        return a field value in T.
 
     trap_profile: Trap_profile
         An instance of a Trap_profile that corresponds to the main_field
-        and trap_strength specified in the config file. Many of the 
-        spec_tool.spec_calc functions take the trap_profile as a 
-        parameter. 
-        
+        and trap_strength specified in the config file. Many of the
+        spec_tool.spec_calc functions take the trap_profile as a
+        parameter.
+
     field_strength: Trap_profile instance method
         Quick access to field strength values. field_strength(rho,z)=
-        field magnitude in T at position (rho,z). Note that there is no 
+        field magnitude in T at position (rho,z). Note that there is no
         field variation in phi. num_legs : int The number of legs the
         animal has (default 4).
 
     Methods
     -------
     load_config_file(config_filename)
-        Loads the config file. 
+        Loads the config file.
 
     load_field_profile()
-        Loads the field profile. 
+        Loads the field profile.
     """
 
-    def __init__(self, config_filename):
+    def __init__(self, config_path):
         """
         Parameters
         ----------
@@ -118,11 +119,11 @@ class Config:
             The name of the config file contained in the
             he6_cres_spec_sims/config_files directory.
         """
-        self.load_config_file(config_filename)
+        self.load_config_file(config_path)
         self.load_field_profile()
 
-    def load_config_file(self, config_filename):
-        """Loads the JSON config file and creates attributes associated 
+    def load_config_file(self, config_path):
+        """Loads the YAML config file and creates attributes associated
         with all configurable parameters.
 
         Parameters
@@ -137,21 +138,17 @@ class Config:
             If config file isn't found or can't be opened.
         """
 
-        filepath = "{}/he6_cres_spec_sims/config_files/{}.json".format(
-            os.getcwd(), config_filename
-        )
         try:
-            with open(filepath, "r") as read_file:
-                config_dict = json.load(read_file)
+            with open(config_path, "r") as read_file:
+                config_dict = yaml.load(read_file, Loader=yaml.FullLoader)
 
                 # Take config parameters from config_file.
-                self.simulation = DotDict(config_dict["Simulation"])
                 self.physics = DotDict(config_dict["Physics"])
-                self.hardware = DotDict(config_dict["Hardware"])
-                self.kinematics = DotDict(config_dict["Kinematics"])
+                self.eventbuilder = DotDict(config_dict["EventBuilder"])
+                self.segmentbuilder = DotDict(config_dict["SegmentBuilder"])
                 self.bandbuilder = DotDict(config_dict["BandBuilder"])
                 self.trackbuilder = DotDict(config_dict["TrackBuilder"])
-                self.downmixer = DotDict(config_dict["DownMixer"])
+                self.downmixer = DotDict(config_dict["DMTrackBuilder"])
                 self.daq = DotDict(config_dict["Daq"])
                 self.specbuilder = DotDict(config_dict["SpecBuilder"])
 
@@ -172,12 +169,12 @@ class Config:
         Raises
         ------
         Exception
-            If field profile fails to load. 
+            If field profile fails to load.
         """
 
         try:
-            main_field = self.hardware.main_field
-            trap_strength = self.hardware.trap_strength
+            main_field = self.eventbuilder.main_field
+            trap_strength = self.eventbuilder.trap_strength
 
             self.trap_profile = load_he6_trap(main_field, trap_strength)
             self.field_strength = self.trap_profile.field_strength_interp
@@ -191,18 +188,21 @@ class Physics:
     """TODO: DOCUMENT"""
 
     def __init__(self, config):
+
         self.config = config
 
     def generate_beta_energy(self):
 
         if self.config.physics.monoenergetic == True:
+
             return self.generate_monoenergetic_beta()
 
         else:
+
             raise NotImplementedError("Only monoenergetic betas have been implemented.")
 
-
     def generate_monoenergetic_beta(self):
+
         return self.config.physics.energy
 
     def generate_beta_position_direction(self):
@@ -212,7 +212,7 @@ class Physics:
         return position, direction
 
 
-class Hardware:
+class EventBuilder:
     """TODO:Document"""
 
     def __init__(self, config):
@@ -220,11 +220,13 @@ class Hardware:
         self.config = config
         self.physics = Physics(config)
 
-    def construct_trapped_events_df(self):
-        print("~~~~~~~~~~~~Hardware Block~~~~~~~~~~~~~~\n")
+    def run(self):
+
+        print("~~~~~~~~~~~~EventBuilder Block~~~~~~~~~~~~~~\n")
         print("Constructing a set of trapped events:")
         event_num = 0
         events_to_simulate = self.config.physics.events_to_simulate
+
         while event_num < events_to_simulate:
 
             print("\nEvent: {}/{}...\n".format(event_num, events_to_simulate - 1))
@@ -248,7 +250,9 @@ class Hardware:
                 is_trapped = self.trap_condition(single_segment_df)
 
             if event_num == 0:
+
                 trapped_event_df = single_segment_df
+
             else:
 
                 trapped_event_df = trapped_event_df.append(
@@ -265,9 +269,10 @@ class Hardware:
         # Initial beta position and direction.
         initial_rho_pos = beta_position[0]
         initial_phi_pos = beta_position[1]
-        initial_zpos = beta_position[2]
+        
         initial_pitch_angle = beta_direction[0]
         initial_phi_dir = beta_direction[1]
+        initial_zpos = beta_position[2]
 
         initial_field = self.config.field_strength(initial_rho_pos, initial_zpos)
         initial_radius = sc.cyc_radius(beta_energy, initial_field, initial_pitch_angle)
@@ -345,7 +350,7 @@ class Hardware:
             print("Not Trapped: Pitch angle too small.")
             trap_condition += 1
 
-        if rho_center + max_radius > self.config.hardware.decay_cell_radius:
+        if rho_center + max_radius > self.config.eventbuilder.decay_cell_radius:
             print("Not Trapped: Collided with guide wall.")
             trap_condition += 1
 
@@ -356,17 +361,17 @@ class Hardware:
             return False
 
 
-class Kinematics:
+class SegmentBuilder:
     """TODO:Document"""
 
     def __init__(self, config):
 
         self.config = config
-        self.hardware = Hardware(config)
+        self.eventbuilder = EventBuilder(config)
 
-    def scatter(self, trapped_event_df):
+    def run(self, trapped_event_df):
         """TODO: DOCUMENT"""
-        print("~~~~~~~~~~~~Kinematics Block~~~~~~~~~~~~~~\n")
+        print("~~~~~~~~~~~~SegmentBuilder Block~~~~~~~~~~~~~~\n")
         # Empty list to be filled with scattered segments.
         scattered_segments_list = []
 
@@ -408,15 +413,15 @@ class Kinematics:
                 print("Jump: {jump_num}".format(jump_num=jump_num))
                 scattered_segment = event.copy()
 
-                # Physics happens. This could maybe be wrapped into a different method.
+                # Physics happens. TODO: This could maybe be wrapped into a different method.
 
                 # Jump Size: Sampled from normal dist.
-                mu = self.config.kinematics.jump_size_eV
-                sigma = self.config.kinematics.jump_std_eV
+                mu = self.config.segmentbuilder.jump_size_eV
+                sigma = self.config.segmentbuilder.jump_std_eV
                 jump_size_eV = np.random.normal(mu, sigma)
 
                 # Delta Pitch Angle: Sampled from normal dist.
-                mu, sigma = 0, self.config.kinematics.pitch_angle_costheta_std
+                mu, sigma = 0, self.config.segmentbuilder.pitch_angle_costheta_std
                 rand_float = np.random.normal(
                     mu, sigma
                 )  # Necessary to properly distribute angles on a sphere.
@@ -440,12 +445,12 @@ class Kinematics:
                 )
 
                 # Third, construct a scattered, meaning potentially not-trapped, segment df
-                scattered_segment_df = self.hardware.construct_untrapped_segment_df(
+                scattered_segment_df = self.eventbuilder.construct_untrapped_segment_df(
                     beta_position, beta_direction, energy, event_num
                 )
 
                 # Fourth, check to see if the scattered beta is trapped.
-                is_trapped = self.hardware.trap_condition(scattered_segment_df)
+                is_trapped = self.eventbuilder.trap_condition(scattered_segment_df)
 
                 jump_num += 1
 
@@ -454,10 +459,10 @@ class Kinematics:
                 if not is_trapped:
                     print("Event no longer trapped.")
                     break
-                if jump_num > self.config.kinematics.jump_num_max:
+                if jump_num > self.config.segmentbuilder.jump_num_max:
                     print(
                         "Event reached jump_num_max : {}".format(
-                            self.config.kinematics.jump_num_max
+                            self.config.segmentbuilder.jump_num_max
                         )
                     )
                     break
@@ -485,8 +490,8 @@ class Kinematics:
 
         df = incomplete_scattered_segments_df.copy()
         trap_profile = self.config.trap_profile
-        main_field = self.config.hardware.main_field
-        decay_cell_radius = self.config.hardware.decay_cell_radius
+        main_field = self.config.eventbuilder.main_field
+        decay_cell_radius = self.config.eventbuilder.decay_cell_radius
 
         # Calculate all relevant segment parameters. Order matters here.
         axial_freq = sc.axial_freq(
@@ -508,7 +513,7 @@ class Kinematics:
             * 2
         )
         slope = sc.df_dt(
-            df["energy"], self.config.hardware.main_field, segment_radiated_power
+            df["energy"], self.config.eventbuilder.main_field, segment_radiated_power
         )
 
         energy_stop = (
@@ -534,7 +539,7 @@ class Kinematics:
 
     def segment_length(self):
         """TODO: DOCUMENT"""
-        mu = self.config.kinematics.mean_track_length
+        mu = self.config.segmentbuilder.mean_track_length
         segment_length = np.random.exponential(mu)
 
         return segment_length
@@ -547,7 +552,7 @@ class BandBuilder:
 
         self.config = config
 
-    def bandbuilder(self, segments_df):
+    def run(self, segments_df):
 
         print("~~~~~~~~~~~~BandBuilder Block~~~~~~~~~~~~~~\n")
         sideband_num = self.config.bandbuilder.sideband_num
@@ -598,7 +603,7 @@ class TrackBuilder:
 
         self.config = config
 
-    def trackbuilder(self, bands_df):
+    def run(self, bands_df):
 
         print("~~~~~~~~~~~~TrackBuilder Block~~~~~~~~~~~~~~\n")
         run_length = self.config.trackbuilder.run_length
@@ -683,17 +688,17 @@ class TrackBuilder:
         return tracks_df
 
 
-class DownMixer:
+class DMTrackBuilder:
     """TODO:Document"""
 
     def __init__(self, config):
 
         self.config = config
 
-    def downmix(self, tracks_df):
+    def run(self, tracks_df):
         """TODO:Document"""
 
-        print("~~~~~~~~~~~~DownMixer Block~~~~~~~~~~~~~~\n")
+        print("~~~~~~~~~~~~DMTrackBuilder Block~~~~~~~~~~~~~~\n")
         print(
             "DownMixing the cyclotron frequency with a {} GHz signal".format(
                 np.around(self.config.downmixer.mixer_freq * 1e-9, 4)
@@ -717,7 +722,7 @@ class Daq:
 
         self.config = config
 
-    def construct_spec_array(self, downmixed_tracks_df):
+    def run(self, downmixed_tracks_df):
         """TODO:Document"""
         print("~~~~~~~~~~~~Daq Block~~~~~~~~~~~~~~\n")
 
@@ -915,11 +920,12 @@ class Daq:
 class SpecBuilder:
     """TODO:Document"""
 
-    def __init__(self, config):
+    def __init__(self, config, config_path):
 
+        self.config_path = config_path
         self.config = config
 
-    def build_spec_file(self, spec_array):
+    def run(self, spec_array):
         """TODO:Document"""
         print("~~~~~~~~~~~~SpecBuilder Block~~~~~~~~~~~~~~\n")
 
@@ -933,18 +939,20 @@ class SpecBuilder:
         freq_bins_per_packet = freq_bins / 4
 
         specfile_name = self.config.specbuilder.specfile_name
-        results_dir = "{}/he6_cres_spec_sims/simulation_results/{}/spec_files".format(
-            os.getcwd(), self.config.simulation.results_dir
-        )
 
-        exists = os.path.isdir(results_dir)
+        # First make a results_dir with the same name as the config.
+        config_name = self.config_path.stem
+        parent_dir = self.config_path.parents[0]
+        results_dir = parent_dir / config_name
 
-        # If folder doesn't exist, then create it.
+        exists = results_dir.is_dir()
+
+        # If results_dir doesn't exist, then create it.
         if not exists:
-            os.makedirs(results_dir)
-            print("created folder : ", results_dir)
+            results_dir.mkdir()
+            print("created directory : ", results_dir)
 
-        spec_path = "{}/{}.spec".format(results_dir, specfile_name)
+        spec_path = results_dir / "{}.spec".format(specfile_name)
 
         # Pass "wb" to write a binary file
         with open(spec_path, "wb") as spec_file:
