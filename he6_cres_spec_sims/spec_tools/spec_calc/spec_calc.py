@@ -29,9 +29,9 @@ from scipy.optimize import fminbound
 from scipy.interpolate import interp1d
 import scipy.special as ss
 
-from he6_cres_spec_sims.spec_tools.coil_classes.coil_form import Coil_form
-from he6_cres_spec_sims.spec_tools.coil_classes.field_profile import Field_profile
-from he6_cres_spec_sims.spec_tools.coil_classes.trap_profile import Trap_profile
+# from he6_cres_spec_sims.spec_tools.coil_classes.coil_form import Coil_form
+# from he6_cres_spec_sims.spec_tools.coil_classes.field_profile import Field_profile
+# from he6_cres_spec_sims.spec_tools.coil_classes.trap_profile import Trap_profile
 
 # Math constants.
 
@@ -156,8 +156,8 @@ def theta_center(zpos, rho, pitch_angle, trap_profile):
 
     if trap_profile.is_trap:
 
-        Bmin = trap_profile.field_strength_interp(rho, 0.0)
-        Bcurr = trap_profile.field_strength_interp(rho, zpos)
+        Bmin = trap_profile.field_strength(rho, 0.0)
+        Bcurr = trap_profile.field_strength(rho, zpos)
 
         theta_center_calc = (
             np.arcsin((np.sqrt(Bmin / Bcurr)) * np.sin(pitch_angle / RAD_TO_DEG))
@@ -193,7 +193,7 @@ def max_radius(energy, center_pitch_angle, rho, trap_profile):
 
     if trap_profile.is_trap:
 
-        min_field = trap_profile.field_strength_interp(rho, 0)
+        min_field = trap_profile.field_strength(rho, 0)
         max_field = min_field / (np.sin(center_pitch_angle / RAD_TO_DEG)) ** 2
 
         center_radius = cyc_radius(energy, min_field, center_pitch_angle)
@@ -221,8 +221,8 @@ def min_theta(rho, zpos, trap_profile):
 
     if trap_profile.is_trap:
 
-        Bmax = trap_profile.field_strength_interp(rho, trap_profile.trap_width[1])
-        Bz = trap_profile.field_strength_interp(rho, zpos)
+        Bmax = trap_profile.field_strength(rho, trap_profile.trap_width[1])
+        Bz = trap_profile.field_strength(rho, zpos)
 
         theta = np.arcsin((Bz / Bmax) ** 0.5) * RAD_TO_DEG
         return theta
@@ -247,8 +247,8 @@ def max_zpos_not_vectorized(center_pitch_angle, rho, trap_profile, debug=False):
 
         else:
 
-            min_field = trap_profile.field_strength_interp(rho, 0)
-            max_field = trap_profile.field_strength_interp(
+            min_field = trap_profile.field_strength(rho, 0)
+            max_field = trap_profile.field_strength(
                 rho, trap_profile.trap_width[1]
             )
 
@@ -264,11 +264,11 @@ def max_zpos_not_vectorized(center_pitch_angle, rho, trap_profile, debug=False):
                 return initial_z
 
             def func(z):
-                curr_field = trap_profile.field_strength_interp(rho, z)
+                curr_field = trap_profile.field_strength(rho, z)
                 return abs(curr_field - max_reached_field)
 
             max_z = fminbound(func, 0, trap_profile.trap_width[1], xtol=1e-14)
-            curr_field = trap_profile.field_strength_interp(rho, max_z)
+            curr_field = trap_profile.field_strength(rho, max_z)
 
             if (curr_field > max_reached_field) and debug == True:
                 print(
@@ -342,15 +342,15 @@ def curr_pitch_angle(rho, zpos, center_pitch_angle, trap_profile):
 
     if trap_profile.is_trap:
 
-        min_field = trap_profile.field_strength_interp(rho, 0)
+        min_field = trap_profile.field_strength(rho, 0)
         max_z = max_zpos(center_pitch_angle, rho, trap_profile)
-        max_reached_field = trap_profile.field_strength_interp(rho, max_z)
+        max_reached_field = trap_profile.field_strength(rho, max_z)
 
         if np.any(abs(zpos) > max_z):
             print("Electron does not reach given zpos")
             curr_pitch = "FAIL"
         else:
-            curr_field = trap_profile.field_strength_interp(rho, zpos)
+            curr_field = trap_profile.field_strength(rho, zpos)
             curr_pitch = np.arcsin(np.sqrt(curr_field / max_reached_field)) * RAD_TO_DEG
 
         return curr_pitch
@@ -370,8 +370,8 @@ def axial_freq_not_vect(energy, center_pitch_angle, rho, trap_profile):
             center_pitch_angle = 89.999
 
         zmax = max_zpos(center_pitch_angle, rho, trap_profile)
-        B = lambda z: trap_profile.field_strength_interp(rho, z)
-        Bmax = trap_profile.field_strength_interp(rho, zmax)
+        B = lambda z: trap_profile.field_strength(rho, z)
+        Bmax = trap_profile.field_strength(rho, zmax)
 
         # Secant of theta as function of z. Use conserved mu to derive.
         sec_theta = lambda z: (1 - B(z) / Bmax) ** (-0.5)
@@ -408,7 +408,7 @@ def avg_cycl_freq_not_vect(energy, center_pitch_angle, rho, trap_profile):
 
     if trap_profile.is_trap:
 
-        Bmin = trap_profile.field_strength_interp(rho, 0)
+        Bmin = trap_profile.field_strength(rho, 0)
         min_trapped_angle = min_theta(rho, 0, trap_profile)
 
         if center_pitch_angle < min_trapped_angle:
@@ -420,8 +420,8 @@ def avg_cycl_freq_not_vect(energy, center_pitch_angle, rho, trap_profile):
 
         else:
             zmax = max_zpos(center_pitch_angle, rho, trap_profile)
-            B = lambda z: trap_profile.field_strength_interp(rho, z)
-            Bmax = trap_profile.field_strength_interp(rho, zmax)
+            B = lambda z: trap_profile.field_strength(rho, z)
+            Bmax = trap_profile.field_strength(rho, zmax)
             integrand = lambda z: B(z) * ((1 - B(z) / Bmax) ** (-0.5))
 
             ax_freq = axial_freq(energy, center_pitch_angle, rho, trap_profile)
@@ -463,8 +463,8 @@ def t_not_vect(energy, zpos, center_pitch_angle, rho, trap_profile):
             center_pitch_angle = 89.999
 
         zmax = max_zpos(center_pitch_angle, rho, trap_profile)
-        B = lambda z: trap_profile.field_strength_interp(rho, z)
-        Bmax = trap_profile.field_strength_interp(rho, zmax)
+        B = lambda z: trap_profile.field_strength(rho, z)
+        Bmax = trap_profile.field_strength(rho, zmax)
 
         # Secant of theta as function of z. Use conserved mu to derive.
         sec_theta = lambda z: (1 - B(z) / Bmax) ** (-0.5)

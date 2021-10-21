@@ -1,0 +1,16 @@
+Overview: 
+
+If you would like to create a new field profile array to be put in he6-cres-spec-sims/he6_cres_spec_sims/spec_tools/trap_field_profile_pkl because you have changed the trap geometry, then this submodule can be used. 
+
+Use: 
+
+Edit the coil geometry in the load_default_field_profiles, then run: 
+
+from he6_cres_spec_sims.spec_tools.creating_trap_geometries.load_default_field_profiles import load_he6_trap
+trap_profile = load_he6_trap(0,1)
+
+This will create a field map: he6-cres-spec-sims/he6_cres_spec_sims/spec_tools/creating_trap_geometries/coil_classes/field_profile_pkl_files/main_field_0.0_trap_current_1.0.csv. 
+This field map can be appropriately renamed and put here: /home/drew/He6CRES/he6-cres-spec-sims/he6_cres_spec_sims/spec_tools/trap_field_profile_pkl. 
+Then the package will behave as normal but with the new trap geometry. Change the grid size to increase precision. It was found 5e-4 was sufficient for ppm precision. 
+
+

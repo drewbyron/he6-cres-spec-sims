@@ -35,6 +35,7 @@ Classes contained in module:
 import json
 import math
 import os
+import pathlib
 import yaml
 
 import numpy as np
@@ -43,7 +44,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from he6_cres_spec_sims.daq.frequency_domain_packet import FDpacket
-from he6_cres_spec_sims.spec_tools.load_default_field_profiles import load_he6_trap
+from he6_cres_spec_sims.spec_tools.trap_field_profile import TrapFieldProfile
 import he6_cres_spec_sims.spec_tools.spec_calc.spec_calc as sc
 import he6_cres_spec_sims.spec_tools.spec_calc.power_calc as pc
 
@@ -174,10 +175,12 @@ class Config:
 
         try:
             main_field = self.eventbuilder.main_field
-            trap_strength = self.eventbuilder.trap_strength
+            trap_current = self.eventbuilder.trap_current
+            # self.trap_profile = load_he6_trap(main_field, trap_current)
+            # self.field_strength = self.trap_profile.field_strength_interp
 
-            self.trap_profile = load_he6_trap(main_field, trap_strength)
-            self.field_strength = self.trap_profile.field_strength_interp
+            self.trap_profile = TrapFieldProfile(main_field, trap_current)
+            self.field_strength = self.trap_profile.field_strength
 
         except Exception as e:
             print("Field profile failed to load.")
@@ -871,33 +874,30 @@ class Daq:
         return spec_array
 
     def get_measured_gain(self):
-        # Now how to open gain and noise:
+  
+        gain_dir = pathlib.Path(__file__).parents[0] / "daq/gain_noise_measurements/"
 
-        results_dir = "{}/he6_cres_spec_sims/daq/gain_noise_measurements/".format(
-            os.getcwd()
-        )
         try:
-            gain_file_path = results_dir + "gain.csv"
+            gain_file_path = gain_dir / "gain.csv"
             gain = np.loadtxt(gain_file_path, delimiter=",")
 
         except Exception as e:
-            print("Unable to open {}/gain.csv".format(results_dir))
+            print("Unable to open {}/gain.csv".format(gain_dir))
             raise e
 
         return gain
 
     def get_measured_noise(self):
-        # Now how to open gain and noise:
 
-        results_dir = "{}/he6_cres_spec_sims/daq/gain_noise_measurements/".format(
-            os.getcwd()
-        )
+        # Now how to open gain and noise:
+        noise_dir = pathlib.Path(__file__).parents[0] / "daq/gain_noise_measurements/"
+
         try:
-            noise_file_path = results_dir + "noise.csv"
+            noise_file_path = noise_dir / "noise.csv"
             noise_smooth_1d = np.loadtxt(noise_file_path, delimiter=",")
 
         except Exception as e:
-            print("Unable to open {}/noise.csv".format(results_dir))
+            print("Unable to open {}/noise.csv".format(noise_dir))
             raise e
 
         return noise_smooth_1d
@@ -982,16 +982,16 @@ class SpecBuilder:
 
     def get_headers(self):
 
-        path = os.getcwd()
-        spec_file_to_grab_headers = (
-            path
-            + "/he6_cres_spec_sims/daq/roach_noise/Freq_data_2021-04-30-13-14-18.spec"
+        header_dir = pathlib.Path(__file__).parents[0]
+        header_path = (
+            header_dir
+            / "daq/example_spec/example_spec_file.spec"
         )
 
         # open file:
         hdr_list = []
         try:
-            with open(spec_file_to_grab_headers, "rb") as in_file:
+            with open(header_path, "rb") as in_file:
                 for m in range(4):
                     hdr = in_file.read(FDpacket.BYTES_IN_HEADER)
                     hdr_list.append(hdr)
@@ -1000,7 +1000,7 @@ class SpecBuilder:
         except Exception as e:
             print(
                 "Do you have a roach noise file at {} ?".format(
-                    spec_file_to_grab_headers
+                    header_path
                 )
             )
             raise e

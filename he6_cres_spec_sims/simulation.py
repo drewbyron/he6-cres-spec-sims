@@ -20,6 +20,7 @@ would be.
 Classes contained in module: 
 
     * Simulation
+    * Results
 
 """
 
@@ -32,7 +33,6 @@ import numpy as np
 import pandas as pd
 
 import he6_cres_spec_sims.spec_tools.spec_calc.spec_calc as sc
-from he6_cres_spec_sims.spec_tools.load_default_field_profiles import load_he6_trap
 from he6_cres_spec_sims import simulation_blocks as sim_blocks
 
 
@@ -88,33 +88,6 @@ class Simulation:
         # Simulate the action of the Daq on the loaded dmtracks.
         spec_array = daq.run(results.dmtracks)
         specbuilder.run(spec_array)
-
-        return None
-
-    def save_df(self, df, filename):
-        """TODO: DOCUMENT"""
-        print("\n**Block Output:**")
-
-        results_dir = "{}/he6_cres_spec_sims/simulation_results/{}".format(
-            os.getcwd(), self.config.simulation.results_dir
-        )
-        print(
-            "{} written to /he6_cres_spec_sims/simulation_results/{}\n".format(
-                filename, self.config.simulation.results_dir
-            )
-        )
-        exists = os.path.isdir(results_dir)
-
-        # If folder doesn't exist, then create it.
-        if not exists:
-            os.makedirs(results_dir)
-            print("created folder : ", results_dir)
-
-        try:
-            df.to_csv("{}/{}.csv".format(results_dir, filename))
-        except Exception as e:
-            print("Unable to open df.")
-            raise e
 
         return None
 
