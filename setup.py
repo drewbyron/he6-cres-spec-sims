@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="he6_cres_spec_sims",
-    version="0.1.1",
+    version="0.1.4",
     description="A package for simulating cres data.",
     url="https://github.com/drewbyron/he6-cres-spec-sims",
     author="William (Drew) Byron",
@@ -12,11 +12,11 @@ setup(
     install_requires=[
         "ipykernel",
         "pathlib2",
-        "numpy>=1.21",
-        "pandas>=1.3",
-        "scipy>=1.7",
+        "numpy>=1.18",
+        "pandas>=1.1",
+        "scipy>=1.5",
         "pyyaml",
-        "matplotlib>=3.4 ",
+        "matplotlib>=3.3 ",
     ],
     include_package_data=True,
     classifiers=[

@@ -318,6 +318,7 @@ class EventBuilder:
             "trapped_initial_pitch_angle": trapped_initial_pitch_angle,
             "max_radius": max_radius,
             "avg_cycl_freq": 0.0,
+            "b_avg" : 0.0,
             "freq_stop": 0.0,
             "zmax": 0.0,
             "axial_freq": 0.0,
@@ -503,6 +504,9 @@ class SegmentBuilder:
         avg_cycl_freq = sc.avg_cycl_freq(
             df["energy"], df["center_theta"], df["rho_center"], trap_profile
         )
+        # TODO: Make this more accurate as per discussion with RJ. 
+        b_avg = sc.energy_and_freq_to_field(df["energy"], avg_cycl_freq)
+
         zmax = sc.max_zpos(df["center_theta"], df["rho_center"], trap_profile)
         mod_index = sc.mod_index(avg_cycl_freq, zmax)
         segment_radiated_power = (
@@ -531,6 +535,7 @@ class SegmentBuilder:
 
         df["axial_freq"] = axial_freq
         df["avg_cycl_freq"] = avg_cycl_freq
+        df["b_avg"] = b_avg
         df["freq_stop"] = freq_stop
         df["energy_stop"] = energy_stop
         df["zmax"] = zmax
@@ -667,26 +672,26 @@ class TrackBuilder:
 
         tracks_df["time_stop"] = tracks_df["time_start"] + tracks_df["segment_length"]
 
-        tracks_df = tracks_df.drop(
-            columns=[
-                "initial_rho_pos",
-                "initial_zpos",
-                "initial_pitch_angle",
-                "trapped_initial_pitch_angle",
-                "initial_phi_dir",
-                "center_theta",
-                "initial_field",
-                "initial_radius",
-                "center_x",
-                "center_y",
-                "rho_center",
-                "max_radius",
-                "zmax",
-                "mod_index",
-                "avg_cycl_freq",
-                "axial_freq",
-            ]
-        )
+        # tracks_df = tracks_df.drop(
+        #     columns=[
+        #         "initial_rho_pos",
+        #         "initial_zpos",
+        #         "initial_pitch_angle",
+        #         "trapped_initial_pitch_angle",
+        #         "initial_phi_dir",
+        #         "center_theta",
+        #         "initial_field",
+        #         "initial_radius",
+        #         "center_x",
+        #         "center_y",
+        #         "rho_center",
+        #         "max_radius",
+        #         "zmax",
+        #         "mod_index",
+        #         "avg_cycl_freq",
+        #         "axial_freq",
+        #     ]
+        # )
 
         return tracks_df
 

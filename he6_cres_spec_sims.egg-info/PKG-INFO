@@ -1,12 +1,14 @@
-Metadata-Version: 1.1
+Metadata-Version: 2.1
 Name: he6-cres-spec-sims
-Version: 0.1.1
+Version: 0.1.4
 Summary: A package for simulating cres data.
 Home-page: https://github.com/drewbyron/he6-cres-spec-sims
 Author: William (Drew) Byron
 Author-email: wbyron@uw.edu
 License: BSD
-Description: UNKNOWN
 Platform: UNKNOWN
 Classifier: Intended Audience :: Science/Research
 Classifier: Operating System :: OS Independent
+
+UNKNOWN
+

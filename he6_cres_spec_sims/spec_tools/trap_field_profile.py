@@ -15,6 +15,8 @@ class TrapFieldProfile:
 
         # TODO: May want to protect these variables with underscores?
         # TODO: Would be nice to have an attribute be the relative trap depth.
+        # TODO: Add in trap radius as an attribute?
+        
         self.trap_current = trap_current
         self.main_field = main_field
 

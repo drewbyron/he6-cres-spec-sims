@@ -1,4 +1,9 @@
-"""
+"""spec_calc
+
+This set of calculators takes cres electron properties (such as energy, pitch angle), as 
+well as information about the trap (instance of a trap_profile object) and outputs other 
+cres electron properties such as axial frequency, z_max, B_avg.
+
 ---
 Units for all module functions' inputs/outputs: 
 
@@ -221,6 +226,7 @@ def min_theta(rho, zpos, trap_profile):
 
     if trap_profile.is_trap:
 
+    	# Be careful here. Technically the Bmax doesn't occur at a constant z.
         Bmax = trap_profile.field_strength(rho, trap_profile.trap_width[1])
         Bz = trap_profile.field_strength(rho, zpos)
 
@@ -290,7 +296,7 @@ def max_zpos_not_vectorized(center_pitch_angle, rho, trap_profile, debug=False):
         return False
 
 
-def max_zpos(center_pitch_angle, rho, trap_profile):
+def max_zpos(center_pitch_angle, rho, trap_profile, debug = False):
 
     """Vectorized version of max_zpos_not_vectorized function."""
 
@@ -378,7 +384,7 @@ def axial_freq_not_vect(energy, center_pitch_angle, rho, trap_profile):
         T_a = (
             4
             / velocity(energy)
-            * integrate.quad(sec_theta, 0, zmax, epsrel=10 ** -2)[0]
+            * integrate.quad(sec_theta, 0, zmax)[0]
         )
 
         axial_frequency = 1 / T_a
