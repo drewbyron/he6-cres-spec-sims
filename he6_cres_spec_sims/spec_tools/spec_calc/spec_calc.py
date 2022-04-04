@@ -62,7 +62,7 @@ def gamma(energy):
 
 
 def momentum(energy):
-    momentum = (((energy + ME) ** 2 - ME ** 2) / C ** 2) ** 0.5 / J_TO_EV
+    momentum = (((energy + ME) ** 2 - ME**2) / C**2) ** 0.5 / J_TO_EV
     return momentum
 
 
@@ -85,8 +85,8 @@ def energy_to_freq(energy, field):
 
 def freq_to_energy(frequency, field):
 
-    """Calculates energy of beta particle in eV given cyclotron 
-    frequency in Hz, magnetic field in Tesla, and pitch angle 
+    """Calculates energy of beta particle in eV given cyclotron
+    frequency in Hz, magnetic field in Tesla, and pitch angle
     at 90 degrees.
     """
 
@@ -94,10 +94,8 @@ def freq_to_energy(frequency, field):
     if np.any(gamma < 1):
         gamma = 1
         max_freq = Q * field / (2 * PI * M)
-        warning = (
-            "Warning: {:.3e} higher than maximum cyclotron frequency {:.3e}".format(
-                frequency, max_freq
-            )
+        warning = "Warning: {} higher than maximum cyclotron frequency {}".format(
+            frequency, max_freq
         )
         print(warning)
     return gamma * ME - ME
@@ -109,7 +107,7 @@ def energy_and_freq_to_field(energy, freq):
 
     # cycl_freq = Q * field / (2 * PI * gamma(energy) * M)
 
-    field = (2 * PI * gamma(energy) * M*freq )/Q
+    field = (2 * PI * gamma(energy) * M * freq) / Q
 
     return field
 
@@ -133,9 +131,9 @@ def random_beta_generator(parameter_dict):
     min_theta = parameter_dict["min_theta"] / RAD_TO_DEG
     max_theta = parameter_dict["max_theta"] / RAD_TO_DEG
 
-    # TODO: Explain this in words. Had to change this 10122021 because 
+    # TODO: Explain this in words. Had to change this 10122021 because
     # it only worked if min_rho was zero.
-    rho_initial = min_rho + np.sqrt(uniform(0, 1) * (max_rho ** 2 - min_rho ** 2))
+    rho_initial = min_rho + np.sqrt(uniform(0, 1) * (max_rho**2 - min_rho**2))
     phi_initial = 2 * PI * uniform(0, 1) * RAD_TO_DEG
     # phi_initial = 0
     z_initial = uniform(min_z, max_z)
@@ -226,7 +224,7 @@ def min_theta(rho, zpos, trap_profile):
 
     if trap_profile.is_trap:
 
-    	# Be careful here. Technically the Bmax doesn't occur at a constant z.
+        # Be careful here. Technically the Bmax doesn't occur at a constant z.
         Bmax = trap_profile.field_strength(rho, trap_profile.trap_width[1])
         Bz = trap_profile.field_strength(rho, zpos)
 
@@ -238,7 +236,7 @@ def min_theta(rho, zpos, trap_profile):
         return False
 
 
-def max_zpos_not_vectorized(center_pitch_angle, rho, trap_profile, debug=False):
+def max_zpos_not_vectorized(energy, center_pitch_angle, rho, trap_profile, debug=False):
 
     """Calculates the maximum axial length from center of trap as a
     function of center_pitch_angle and rho. Not vectorized. See below
@@ -252,11 +250,12 @@ def max_zpos_not_vectorized(center_pitch_angle, rho, trap_profile, debug=False):
             return False
 
         else:
+            # Ok, so does this mean we now have an energy dependence on zmax? Yes.
+            c_r = cyc_radius(energy,trap_profile.field_strength(rho,0), center_pitch_angle)
+            rho_p = np.sqrt(rho**2+c_r**2/2)
 
-            min_field = trap_profile.field_strength(rho, 0)
-            max_field = trap_profile.field_strength(
-                rho, trap_profile.trap_width[1]
-            )
+            min_field = trap_profile.field_strength(rho_p, 0)
+            max_field = trap_profile.field_strength(rho_p, trap_profile.trap_width[1])
 
             max_reached_field = min_field / pow(
                 math.sin(center_pitch_angle * math.pi / 180), 2
@@ -270,11 +269,11 @@ def max_zpos_not_vectorized(center_pitch_angle, rho, trap_profile, debug=False):
                 return initial_z
 
             def func(z):
-                curr_field = trap_profile.field_strength(rho, z)
+                curr_field = trap_profile.field_strength(rho_p, z)
                 return abs(curr_field - max_reached_field)
 
             max_z = fminbound(func, 0, trap_profile.trap_width[1], xtol=1e-14)
-            curr_field = trap_profile.field_strength(rho, max_z)
+            curr_field = trap_profile.field_strength(rho_p, max_z)
 
             if (curr_field > max_reached_field) and debug == True:
                 print(
@@ -296,13 +295,13 @@ def max_zpos_not_vectorized(center_pitch_angle, rho, trap_profile, debug=False):
         return False
 
 
-def max_zpos(center_pitch_angle, rho, trap_profile, debug = False):
+def max_zpos(energy, center_pitch_angle, rho, trap_profile, debug=False):
 
     """Vectorized version of max_zpos_not_vectorized function."""
 
     max_zpos_vectorized = np.vectorize(max_zpos_not_vectorized)
 
-    return max_zpos_vectorized(center_pitch_angle, rho, trap_profile)
+    return max_zpos_vectorized(energy, center_pitch_angle, rho, trap_profile)
 
 
 def mod_index(avg_cycl_freq, zmax):
@@ -318,7 +317,7 @@ def mod_index(avg_cycl_freq, zmax):
     # calculated parameters
     omega = 2 * PI * avg_cycl_freq
     k_wave = omega / C
-    beta = np.sqrt(k_wave ** 2 - kc ** 2)
+    beta = np.sqrt(k_wave**2 - kc**2)
 
     phase_vel = omega / beta
 
@@ -335,7 +334,7 @@ def df_dt(energy, field, power):
 
     energy_Joules = (energy + ME) / J_TO_EV
 
-    slope = (Q * field * C ** 2) / (2 * PI) * (power) / (energy_Joules) ** 2
+    slope = (Q * field * C**2) / (2 * PI) * (power) / (energy_Joules) ** 2
 
     return slope
 
@@ -375,17 +374,18 @@ def axial_freq_not_vect(energy, center_pitch_angle, rho, trap_profile):
         if center_pitch_angle == 90.0:
             center_pitch_angle = 89.999
 
-        zmax = max_zpos(center_pitch_angle, rho, trap_profile)
-        B = lambda z: trap_profile.field_strength(rho, z)
-        Bmax = trap_profile.field_strength(rho, zmax)
+        zmax = max_zpos(energy,center_pitch_angle, rho, trap_profile)
+
+        c_r = cyc_radius(energy,trap_profile.field_strength(rho,0), center_pitch_angle)    
+        rho_p = np.sqrt(rho**2+c_r**2/2)
+
+        
+        B = lambda z: trap_profile.field_strength(rho_p, z)
+        Bmax = trap_profile.field_strength(rho_p, zmax)
 
         # Secant of theta as function of z. Use conserved mu to derive.
         sec_theta = lambda z: (1 - B(z) / Bmax) ** (-0.5)
-        T_a = (
-            4
-            / velocity(energy)
-            * integrate.quad(sec_theta, 0, zmax)[0]
-        )
+        T_a = 4 / velocity(energy) * integrate.quad(sec_theta, 0, zmax)[0]
 
         axial_frequency = 1 / T_a
 
@@ -425,20 +425,20 @@ def avg_cycl_freq_not_vect(energy, center_pitch_angle, rho, trap_profile):
             avg_cyc_freq = energy_to_freq(energy, Bmin)
 
         else:
-            zmax = max_zpos(center_pitch_angle, rho, trap_profile)
+            zmax = max_zpos(energy,center_pitch_angle, rho, trap_profile)
             B = lambda z: trap_profile.field_strength(rho, z)
             Bmax = trap_profile.field_strength(rho, zmax)
             integrand = lambda z: B(z) * ((1 - B(z) / Bmax) ** (-0.5))
 
             ax_freq = axial_freq(energy, center_pitch_angle, rho, trap_profile)
-            
+
             # Similar to axial_freq calculation.
             avg_cyc_freq = (
                 4
                 * Q
                 * ax_freq
                 / (2 * PI * momentum(energy))
-                * integrate.quad(integrand, 0, zmax, epsrel=10 ** -2)[0]
+                * integrate.quad(integrand, 0, zmax, epsrel=10**-2)[0]
             )
 
         return avg_cyc_freq
@@ -448,13 +448,78 @@ def avg_cycl_freq_not_vect(energy, center_pitch_angle, rho, trap_profile):
         return False
 
 
-def avg_cycl_freq(energy, center_pitch_angle, rho, trap_profile):
+# def avg_cycl_freq(energy, center_pitch_angle, rho, trap_profile):
 
-    """Vectorized version of avg_cyc_freq_not_vectorized function."""
+#     """Vectorized version of avg_cyc_freq_not_vectorized function."""
 
-    avg_cycl_freq_vect = np.vectorize(avg_cycl_freq_not_vect)
+#     avg_cycl_freq_vect = np.vectorize(avg_cycl_freq_not_vect)
 
-    return avg_cycl_freq_vect(energy, center_pitch_angle, rho, trap_profile)
+#     return avg_cycl_freq_vect(energy, center_pitch_angle, rho, trap_profile)
+
+def avg_cycl_freq(energy, center_pitch_angle, rho, trap_profile): 
+
+    field = b_avg(energy, center_pitch_angle, rho, trap_profile)
+
+    return energy_to_freq(energy, field )
+
+def b_avg_not_vect(energy, center_pitch_angle, rho, trap_profile):
+
+    """Calculates the average magnetic field experienced by an electron
+    of a given kinetic energy, main field, and center pitch angle.
+    Returns 0 if electron is not trapped.
+    """
+
+    c_r = cyc_radius(
+                energy, trap_profile.field_strength(rho, 0), center_pitch_angle
+            )
+
+    rho_p = np.sqrt(rho**2 + c_r**2 / 2)
+    rho_pp = np.sqrt(rho**2 + c_r**2)
+
+    if trap_profile.is_trap:
+
+        Bmin = trap_profile.field_strength(rho_p, 0)
+        min_trapped_angle = min_theta(rho_p, 0, trap_profile)
+
+        if center_pitch_angle < min_trapped_angle:
+            print("Warning: (avg_cyc) electron not trapped.")
+            return False
+
+        if center_pitch_angle == 90.0:
+            avg_cyc_freq = energy_to_freq(energy, Bmin)
+
+        else:
+            
+
+            zmax = max_zpos(energy,center_pitch_angle, rho, trap_profile)
+            B1 = lambda z: trap_profile.field_strength(rho_pp, z)
+            B = lambda z: trap_profile.field_strength(rho_p, z)
+            Bmax = trap_profile.field_strength(rho_p, zmax)
+            integrand = lambda z: B1(z) * ((1 - B(z) / Bmax) ** (-0.5))
+
+            ax_freq = axial_freq(energy, center_pitch_angle, rho, trap_profile)
+
+            # Similar to axial_freq calculation.
+            b_avg = (
+                4
+                * ax_freq
+                / (velocity(energy))
+                * integrate.quad(integrand, 0, zmax, epsrel=10**-3)[0]
+            )
+
+        return b_avg
+
+    else:
+        print("ERROR: Given trap profile is not a valid trap")
+        return False
+
+def b_avg(energy, center_pitch_angle, rho, trap_profile):
+
+    """Vectorized version of b_avg_not_vectorized function."""
+
+    b_avg_vect = np.vectorize(b_avg_not_vect)
+
+    return b_avg_vect(energy, center_pitch_angle, rho, trap_profile)
 
 
 def t_not_vect(energy, zpos, center_pitch_angle, rho, trap_profile):
@@ -468,7 +533,7 @@ def t_not_vect(energy, zpos, center_pitch_angle, rho, trap_profile):
         if center_pitch_angle == 90.0:
             center_pitch_angle = 89.999
 
-        zmax = max_zpos(center_pitch_angle, rho, trap_profile)
+        zmax = max_zpos(energy,center_pitch_angle, rho, trap_profile)
         B = lambda z: trap_profile.field_strength(rho, z)
         Bmax = trap_profile.field_strength(rho, zmax)
 
@@ -477,7 +542,7 @@ def t_not_vect(energy, zpos, center_pitch_angle, rho, trap_profile):
         t = (
             1
             / velocity(energy)
-            * integrate.quad(sec_theta, 0, zpos, epsrel=10 ** -2)[0]
+            * integrate.quad(sec_theta, 0, zpos, epsrel=10**-2)[0]
         )
 
         if zpos > zmax:
@@ -506,15 +571,6 @@ def sideband_calc(avg_cycl_freq, axial_freq, zmax, num_sidebands=7):
     (axial_freq), and maximum axial amplitude (zmax).
     """
 
-    # #Physical and mathematical constants
-    # m = 9.1093837015e-31 # Electron rest mass, in kg.
-    # c = 299792458 #Speed of light in vacuum, in m/s
-    # p11prime = 1.84118 #first zero of J1 prime
-
-    # #fixed experiment parameters
-    # waveguide_radius = 0.578e-2
-    # kc = p11prime / waveguide_radius
-
     # fixed experiment parameters
     waveguide_radius = 0.578e-2
     kc = P11_PRIME / waveguide_radius
@@ -522,7 +578,7 @@ def sideband_calc(avg_cycl_freq, axial_freq, zmax, num_sidebands=7):
     # calculated parameters
     omega = 2 * PI * avg_cycl_freq
     k_wave = omega / C
-    beta = np.sqrt(k_wave ** 2 - kc ** 2)
+    beta = np.sqrt(k_wave**2 - kc**2)
 
     phase_vel = omega / beta
 
@@ -535,11 +591,6 @@ def sideband_calc(avg_cycl_freq, axial_freq, zmax, num_sidebands=7):
     sidebands = []
 
     for k in range(-num_sidebands, num_sidebands + 1):
-
-        # if axial_freq == "Indexed":
-        #     freq = k
-        # else:
-        #     freq = avg_cycl_freq + k * axial_freq
 
         freq = avg_cycl_freq + k * axial_freq
         magnitude = abs(ss.jv(k, K))
