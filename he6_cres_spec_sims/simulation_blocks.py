@@ -45,9 +45,9 @@ import matplotlib.pyplot as plt
 
 from he6_cres_spec_sims.daq.frequency_domain_packet import FDpacket
 from he6_cres_spec_sims.spec_tools.trap_field_profile import TrapFieldProfile
+from he6_cres_spec_sims.spec_tools.beta_source.beta_source import BetaSource
 import he6_cres_spec_sims.spec_tools.spec_calc.spec_calc as sc
 import he6_cres_spec_sims.spec_tools.spec_calc.power_calc as pc
-
 
 # TODO: Make the seed a config parameter, and pass rng(seed) around.
 
@@ -193,20 +193,24 @@ class Physics:
     def __init__(self, config):
 
         self.config = config
+        self.bs = BetaSource(config)
 
     def generate_beta_energy(self):
 
-        if self.config.physics.monoenergetic == True:
+        # Idea: 
 
-            return self.generate_monoenergetic_beta()
+        return self.bs.get_energy()
+        # if self.config.physics.monoenergetic == True:
 
-        else:
+        #     return self.generate_monoenergetic_beta()
 
-            raise NotImplementedError("Only monoenergetic betas have been implemented.")
+        # else:
 
-    def generate_monoenergetic_beta(self):
+        #     raise NotImplementedError("Only monoenergetic betas have been implemented.")
 
-        return self.config.physics.energy
+    # def generate_monoenergetic_beta(self):
+
+    #     return self.config.physics.energy
 
     def generate_beta_position_direction(self):
 
