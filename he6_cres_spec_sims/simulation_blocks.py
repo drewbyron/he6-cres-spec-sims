@@ -195,22 +195,12 @@ class Physics:
         self.config = config
         self.bs = BetaSource(config)
 
-    def generate_beta_energy(self):
+    def generate_beta_energy(self, beta_num):
 
-        # Idea: 
+        # Make this neater, have this function return energy in eV
 
-        return self.bs.get_energy()
-        # if self.config.physics.monoenergetic == True:
+        return self.bs.energy_array[beta_num]
 
-        #     return self.generate_monoenergetic_beta()
-
-        # else:
-
-        #     raise NotImplementedError("Only monoenergetic betas have been implemented.")
-
-    # def generate_monoenergetic_beta(self):
-
-    #     return self.config.physics.energy
 
     def generate_beta_position_direction(self):
 
@@ -231,7 +221,10 @@ class EventBuilder:
 
         print("~~~~~~~~~~~~EventBuilder Block~~~~~~~~~~~~~~\n")
         print("Constructing a set of trapped events:")
+        # event_num denotes the number of trapped electrons simulated.
         event_num = 0
+        # beta_num denotes the total number of betas produced in the trap.
+        beta_num = 0
         events_to_simulate = self.config.physics.events_to_simulate
 
         while event_num < events_to_simulate:
@@ -243,15 +236,18 @@ class EventBuilder:
 
             while not is_trapped:
 
+                # Does this miss some betas??? Be sure it doesn't. 
+                beta_num += 1
+
                 (
                     initial_position,
                     initial_direction,
                 ) = self.physics.generate_beta_position_direction()
 
-                energy = self.physics.generate_beta_energy()
-
+                energy = self.physics.generate_beta_energy(beta_num)
+                print(energy)
                 single_segment_df = self.construct_untrapped_segment_df(
-                    initial_position, initial_direction, energy, event_num
+                    initial_position, initial_direction, energy, event_num, beta_num
                 )
 
                 is_trapped = self.trap_condition(single_segment_df)
@@ -270,13 +266,13 @@ class EventBuilder:
         return trapped_event_df
 
     def construct_untrapped_segment_df(
-        self, beta_position, beta_direction, beta_energy, event_num
+        self, beta_position, beta_direction, beta_energy, event_num, beta_num
     ):
         """TODO:Document"""
         # Initial beta position and direction.
         initial_rho_pos = beta_position[0]
         initial_phi_pos = beta_position[1]
-        
+
         initial_pitch_angle = beta_direction[0]
         initial_phi_dir = beta_direction[1]
         initial_zpos = beta_position[2]
@@ -291,7 +287,7 @@ class EventBuilder:
         )
         center_y = initial_radius * np.sin((90 - initial_phi_dir) / RAD_TO_DEG)
 
-        rho_center = np.sqrt(center_x ** 2 + center_y ** 2)
+        rho_center = np.sqrt(center_x**2 + center_y**2)
 
         center_theta = sc.theta_center(
             initial_zpos, rho_center, initial_pitch_angle, self.config.trap_profile
@@ -322,7 +318,7 @@ class EventBuilder:
             "trapped_initial_pitch_angle": trapped_initial_pitch_angle,
             "max_radius": max_radius,
             "avg_cycl_freq": 0.0,
-            "b_avg" : 0.0,
+            "b_avg": 0.0,
             "freq_stop": 0.0,
             "zmax": 0.0,
             "axial_freq": 0.0,
@@ -334,6 +330,8 @@ class EventBuilder:
             "band_num": np.NaN,
             "segment_num": 0,
             "event_num": event_num,
+            "beta_num": beta_num,
+            "fraction_of_spectrum": self.physics.bs.fraction_of_spectrum
         }
 
         segment_df = pd.DataFrame(segment_properties, index=[event_num])
@@ -351,6 +349,7 @@ class EventBuilder:
         trapped_initial_pitch_angle = segment_df["trapped_initial_pitch_angle"][0]
         rho_center = segment_df["rho_center"][0]
         max_radius = segment_df["max_radius"][0]
+        energy = segment_df["energy"][0]
 
         trap_condition = 0
 
@@ -362,8 +361,20 @@ class EventBuilder:
             print("Not Trapped: Collided with guide wall.")
             trap_condition += 1
 
+        # # For now cutting any electron whose cycl frequency is not in the right range.
+        # # Don't make this range too tight as it just uses an approximation
+        # # of the cycl_freq.
+        # print(approx_cycl_freq)
+        # print(energy)
+        # print(freq_acceptance_low,type(freq_acceptance_low))
+        # if (approx_cycl_freq < freq_acceptance_low) or (
+        #     approx_cycl_freq > freq_acceptance_high
+        # ):
+        #     print("Not Detectable: Approx cycl_freq outside of freq acceptance.")
+        #     trap_condition += 1
+
         if trap_condition == 0:
-            print("Trapped!")
+            print("Trapped and Detectable!")
             return True
         else:
             return False
@@ -406,6 +417,7 @@ class SegmentBuilder:
             energy = event["energy"]
             energy_stop = event["energy_stop"]
             event_num = event["event_num"]
+            beta_num = event["beta_num"]
 
             segment_radiated_power = event["segment_power"] * 2
 
@@ -454,7 +466,7 @@ class SegmentBuilder:
 
                 # Third, construct a scattered, meaning potentially not-trapped, segment df
                 scattered_segment_df = self.eventbuilder.construct_untrapped_segment_df(
-                    beta_position, beta_direction, energy, event_num
+                    beta_position, beta_direction, energy, event_num, beta_num
                 )
 
                 # Fourth, check to see if the scattered beta is trapped.
@@ -505,13 +517,17 @@ class SegmentBuilder:
         axial_freq = sc.axial_freq(
             df["energy"], df["center_theta"], df["rho_center"], trap_profile
         )
-        avg_cycl_freq = sc.avg_cycl_freq(
+        # avg_cycl_freq = sc.avg_cycl_freq(
+        #     df["energy"], df["center_theta"], df["rho_center"], trap_profile
+        # )
+
+        # TODO: Make this more accurate as per discussion with RJ.
+        b_avg = sc.b_avg(df["energy"], df["center_theta"], df["rho_center"], trap_profile)
+        avg_cycl_freq = sc.energy_to_freq(df["energy"], b_avg)
+
+        zmax = sc.max_zpos(
             df["energy"], df["center_theta"], df["rho_center"], trap_profile
         )
-        # TODO: Make this more accurate as per discussion with RJ. 
-        b_avg = sc.energy_and_freq_to_field(df["energy"], avg_cycl_freq)
-
-        zmax = sc.max_zpos(df["energy"], df["center_theta"], df["rho_center"], trap_profile)
         mod_index = sc.mod_index(avg_cycl_freq, zmax)
         segment_radiated_power = (
             pc.power_calc(
@@ -883,7 +899,7 @@ class Daq:
         return spec_array
 
     def get_measured_gain(self):
-  
+
         gain_dir = pathlib.Path(__file__).parents[0] / "daq/gain_noise_measurements/"
 
         try:
@@ -992,10 +1008,7 @@ class SpecBuilder:
     def get_headers(self):
 
         header_dir = pathlib.Path(__file__).parents[0]
-        header_path = (
-            header_dir
-            / "daq/example_spec/example_spec_file.spec"
-        )
+        header_path = header_dir / "daq/example_spec/example_spec_file.spec"
 
         # open file:
         hdr_list = []
@@ -1007,11 +1020,7 @@ class SpecBuilder:
                     data = in_file.read(FDpacket.BYTES_IN_PAYLOAD)
 
         except Exception as e:
-            print(
-                "Do you have a roach noise file at {} ?".format(
-                    header_path
-                )
-            )
+            print("Do you have a roach noise file at {} ?".format(header_path))
             raise e
 
         return hdr_list

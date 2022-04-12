@@ -447,15 +447,6 @@ def avg_cycl_freq_not_vect(energy, center_pitch_angle, rho, trap_profile):
         print("ERROR: Given trap profile is not a valid trap")
         return False
 
-
-# def avg_cycl_freq(energy, center_pitch_angle, rho, trap_profile):
-
-#     """Vectorized version of avg_cyc_freq_not_vectorized function."""
-
-#     avg_cycl_freq_vect = np.vectorize(avg_cycl_freq_not_vect)
-
-#     return avg_cycl_freq_vect(energy, center_pitch_angle, rho, trap_profile)
-
 def avg_cycl_freq(energy, center_pitch_angle, rho, trap_profile): 
 
     field = b_avg(energy, center_pitch_angle, rho, trap_profile)

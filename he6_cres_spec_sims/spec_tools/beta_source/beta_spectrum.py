@@ -10,6 +10,8 @@ me = 511 * 1e3
 hbarc = 197.3
 mprot = 1836.15267389
 
+ME = 5.10998950e5  # Electron rest mass (eV).
+
 
 def p(W):
     return np.sqrt(W**2 - 1)
@@ -119,6 +121,7 @@ def dNdE(W, Wmax, Z, A):
 
     return dNdE_unnormed(W, Wmax, Z, A) / norm
 
+# ---------- REORGANIZE THIS MODULE. ---------------
 
 class BetaSpectrum:
     """A class used to contain the field map and configurable parameters
@@ -150,6 +153,7 @@ class BetaSpectrum:
         self.A = isotope_info["A"]
 
     def dNdE(self, W):
+
         def dNdE_unnormed(W, Wmax, Z, A):
             return (
                 dNdEnaive(W, Wmax, Z, A)
@@ -160,6 +164,7 @@ class BetaSpectrum:
 
         if self.dNdE_norm is None:
 
+            print("Calulating beta_spectrum norm.")
             norm, norm_err = integrate.quad(
                 dNdE_unnormed,
                 1.0,
@@ -169,3 +174,48 @@ class BetaSpectrum:
             self.dNdE_norm = norm
 
         return dNdE_unnormed(W, self.Wmax, self.Z, self.A) / self.dNdE_norm
+
+
+    def energy_samples(self, n, E_start, E_stop): 
+
+        """Produce n random samples from dNdE(E) between E_start and E_stop assuming constant spacing in Ws.
+        Also return the fraction of the entire spectrum this accounts for. """
+        fraction_of_spectrum = None 
+
+        W_start = (E_start + ME) / ME
+        W_stop = (E_stop + ME) / ME
+        print(W_start, W_stop)
+
+        if fraction_of_spectrum == None: 
+            fraction_of_spectrum, norm_err = integrate.quad(
+                    self.dNdE,
+                    W_start,
+                    W_stop,
+                )
+            print(fraction_of_spectrum, norm_err)
+        # Providing the pdf exactly 1 or Wmax leads to errors. 
+        epsilon = 10**-2
+        energy_intervals = 10**4
+        Es = np.linspace(E_start + epsilon ,E_stop-epsilon, energy_intervals)
+
+        Ws = (Es + ME) / ME
+        pdf = self.dNdE(Ws)
+
+        # get cumulative distribution from 0 to 1
+        cumpdf = np.cumsum(pdf)
+        cumpdf *= 1/cumpdf[-1]
+
+        # input random values
+        randv = np.random.uniform(size=n)
+
+        # find where random values would go
+        idx1 = np.searchsorted(cumpdf, randv)
+        # get previous value, avoiding division by zero below
+        idx0 = np.where(idx1==0, 0, idx1-1)
+        idx1[idx0==0] = 1
+
+        # do linear interpolation in x
+        frac1 = (randv - cumpdf[idx0]) / (cumpdf[idx1] - cumpdf[idx0])
+        energy_samples = Es[idx0]*(1-frac1) + Es[idx1]*frac1
+
+        return energy_samples, fraction_of_spectrum
