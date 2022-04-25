@@ -32,17 +32,17 @@ class BetaSource:
 
         # Include all the sources here.
         self.isotopes = {
-            "Ne19": {"Wmax": 4.337377690802349, "Z": 9, "A": 19},
+            "Ne19": {"Wmax": 5.337377690802349, "Z": 9, "A": 19},
             "He6": {"Wmax": 0, "Z": 0, "A": 0},
         }
 
         if (self.source["beta_source"] == "Ne19") or (
             self.source["beta_source"] == "He6"
         ):
-            print("Ne19 or He6 source.")
+            print("\nSource: {}\n".format(self.source["beta_source"]))
             self.beta_spectrum = BetaSpectrum(self.isotopes[self.source["beta_source"]])
 
-        self.make_energy_samples()
+            self.make_energy_samples()
 
     def make_energy_samples(self):
 
@@ -73,19 +73,13 @@ class BetaSource:
                     self.energy_array_len,
                     self.energy_acceptance_low,
                     self.energy_acceptance_high,
+                    self.config.settings.rand_seed,
                 )
-                print((
-                    self.energy_array,
-                    self.fraction_of_spectrum,
-                ))
+
+                print("Fraction of total spectrum: {}\n ".format(self.fraction_of_spectrum))
 
             return None
 
         else:
 
             raise NotImplementedError("Kr needs to be reimplimented.")
-
-        # Be sure this doesn't add any weird sampling issues.
-        # This will break if beta_num is larger than energy_array_len. Think about.
-        print(self.energy_array[beta_num])
-        return self.energy_array[beta_num]

@@ -23,20 +23,14 @@ import math
 import os
 
 import numpy as np
-from numpy.random import uniform
 
-# import json
-# from pathlib import Path
-# from scipy.integrate import romberg
+# from numpy.random import uniform
+
 import scipy.integrate as integrate
 from scipy.optimize import fmin
 from scipy.optimize import fminbound
 from scipy.interpolate import interp1d
 import scipy.special as ss
-
-# from he6_cres_spec_sims.spec_tools.coil_classes.coil_form import Coil_form
-# from he6_cres_spec_sims.spec_tools.coil_classes.field_profile import Field_profile
-# from he6_cres_spec_sims.spec_tools.coil_classes.trap_profile import Trap_profile
 
 # Math constants.
 
@@ -112,7 +106,7 @@ def energy_and_freq_to_field(energy, freq):
     return field
 
 
-def random_beta_generator(parameter_dict):
+def random_beta_generator(parameter_dict, rand_seed):
 
     """TODO(byron): Think about if the phi_initial parameter has an
     effect.
@@ -121,6 +115,8 @@ def random_beta_generator(parameter_dict):
     min_theta and max_theta , and initial position (rho,0,z) between
     min_rho and max_rho and min_z and max_z.
     """
+    # Initialize rng. Mult by arbitrary int because seed may be used elsewhere.
+    rng = np.random.default_rng(rand_seed * 11)
 
     min_rho = parameter_dict["min_rho"]
     max_rho = parameter_dict["max_rho"]
@@ -133,16 +129,16 @@ def random_beta_generator(parameter_dict):
 
     # TODO: Explain this in words. Had to change this 10122021 because
     # it only worked if min_rho was zero.
-    rho_initial = min_rho + np.sqrt(uniform(0, 1) * (max_rho**2 - min_rho**2))
-    phi_initial = 2 * PI * uniform(0, 1) * RAD_TO_DEG
+    rho_initial = min_rho + np.sqrt(rng.uniform(0, 1) * (max_rho**2 - min_rho**2))
+    phi_initial = 2 * PI * rng.uniform(0, 1) * RAD_TO_DEG
     # phi_initial = 0
-    z_initial = uniform(min_z, max_z)
+    z_initial = rng.uniform(min_z, max_z)
 
     u_min = (1 - np.cos(min_theta)) / 2
     u_max = (1 - np.cos(max_theta)) / 2
 
-    sphere_theta_initial = np.arccos(1 - 2 * (uniform(u_min, u_max))) * RAD_TO_DEG
-    sphere_phi_initial = 2 * PI * uniform(0, 1) * RAD_TO_DEG
+    sphere_theta_initial = np.arccos(1 - 2 * (rng.uniform(u_min, u_max))) * RAD_TO_DEG
+    sphere_phi_initial = 2 * PI * rng.uniform(0, 1) * RAD_TO_DEG
 
     position = [rho_initial, phi_initial, z_initial]
     direction = [sphere_theta_initial, sphere_phi_initial]
@@ -190,7 +186,7 @@ def cyc_radius(energy, field, pitch_angle):
 def max_radius(energy, center_pitch_angle, rho, trap_profile):
 
     """Calculates the maximum cyclotron radius of a beta electron given
-    thekinetic energy, trap_profile, and center pitch angle (pitch angle
+    the kinetic energy, trap_profile, and center pitch angle (pitch angle
     at center of trap).
     """
 
@@ -202,14 +198,43 @@ def max_radius(energy, center_pitch_angle, rho, trap_profile):
         center_radius = cyc_radius(energy, min_field, center_pitch_angle)
         end_radius = cyc_radius(energy, max_field, pitch_angle=90)
 
-        if np.any(center_radius >= end_radius):
+        if np.all(center_radius >= end_radius):
             return center_radius
         else:
             print(
                 "Warning: max_radius is occuring at end of trap (theta=90). \
                 Something odd may be going on."
             )
+            return False
+
+    else:
+        print("ERROR: Given trap profile is not a valid trap")
+        return False
+
+
+def min_radius(energy, center_pitch_angle, rho, trap_profile):
+
+    """Calculates the minimum cyclotron radius of a beta electron given
+    the kinetic energy, trap_profile, and center pitch angle (pitch angle
+    at center of trap).
+    """
+
+    if trap_profile.is_trap:
+
+        min_field = trap_profile.field_strength(rho, 0)
+        max_field = min_field / (np.sin(center_pitch_angle / RAD_TO_DEG)) ** 2
+
+        center_radius = cyc_radius(energy, min_field, center_pitch_angle)
+        end_radius = cyc_radius(energy, max_field, pitch_angle=90)
+
+        if np.all(center_radius >= end_radius):
             return end_radius
+        else:
+            print(
+                "Warning: min_radius is occuring at center of trap, something \
+                odd may be going on."
+            )
+            return False
 
     else:
         print("ERROR: Given trap profile is not a valid trap")
@@ -251,8 +276,10 @@ def max_zpos_not_vectorized(energy, center_pitch_angle, rho, trap_profile, debug
 
         else:
             # Ok, so does this mean we now have an energy dependence on zmax? Yes.
-            c_r = cyc_radius(energy,trap_profile.field_strength(rho,0), center_pitch_angle)
-            rho_p = np.sqrt(rho**2+c_r**2/2)
+            c_r = cyc_radius(
+                energy, trap_profile.field_strength(rho, 0), center_pitch_angle
+            )
+            rho_p = np.sqrt(rho**2 + c_r**2 / 2)
 
             min_field = trap_profile.field_strength(rho_p, 0)
             max_field = trap_profile.field_strength(rho_p, trap_profile.trap_width[1])
@@ -374,12 +401,13 @@ def axial_freq_not_vect(energy, center_pitch_angle, rho, trap_profile):
         if center_pitch_angle == 90.0:
             center_pitch_angle = 89.999
 
-        zmax = max_zpos(energy,center_pitch_angle, rho, trap_profile)
+        zmax = max_zpos(energy, center_pitch_angle, rho, trap_profile)
 
-        c_r = cyc_radius(energy,trap_profile.field_strength(rho,0), center_pitch_angle)    
-        rho_p = np.sqrt(rho**2+c_r**2/2)
+        c_r = cyc_radius(
+            energy, trap_profile.field_strength(rho, 0), center_pitch_angle
+        )
+        rho_p = np.sqrt(rho**2 + c_r**2 / 2)
 
-        
         B = lambda z: trap_profile.field_strength(rho_p, z)
         Bmax = trap_profile.field_strength(rho_p, zmax)
 
@@ -425,7 +453,7 @@ def avg_cycl_freq_not_vect(energy, center_pitch_angle, rho, trap_profile):
             avg_cyc_freq = energy_to_freq(energy, Bmin)
 
         else:
-            zmax = max_zpos(energy,center_pitch_angle, rho, trap_profile)
+            zmax = max_zpos(energy, center_pitch_angle, rho, trap_profile)
             B = lambda z: trap_profile.field_strength(rho, z)
             Bmax = trap_profile.field_strength(rho, zmax)
             integrand = lambda z: B(z) * ((1 - B(z) / Bmax) ** (-0.5))
@@ -447,11 +475,13 @@ def avg_cycl_freq_not_vect(energy, center_pitch_angle, rho, trap_profile):
         print("ERROR: Given trap profile is not a valid trap")
         return False
 
-def avg_cycl_freq(energy, center_pitch_angle, rho, trap_profile): 
+
+def avg_cycl_freq(energy, center_pitch_angle, rho, trap_profile):
 
     field = b_avg(energy, center_pitch_angle, rho, trap_profile)
 
-    return energy_to_freq(energy, field )
+    return energy_to_freq(energy, field)
+
 
 def b_avg_not_vect(energy, center_pitch_angle, rho, trap_profile):
 
@@ -460,9 +490,7 @@ def b_avg_not_vect(energy, center_pitch_angle, rho, trap_profile):
     Returns 0 if electron is not trapped.
     """
 
-    c_r = cyc_radius(
-                energy, trap_profile.field_strength(rho, 0), center_pitch_angle
-            )
+    c_r = cyc_radius(energy, trap_profile.field_strength(rho, 0), center_pitch_angle)
 
     rho_p = np.sqrt(rho**2 + c_r**2 / 2)
     rho_pp = np.sqrt(rho**2 + c_r**2)
@@ -480,9 +508,8 @@ def b_avg_not_vect(energy, center_pitch_angle, rho, trap_profile):
             avg_cyc_freq = energy_to_freq(energy, Bmin)
 
         else:
-            
 
-            zmax = max_zpos(energy,center_pitch_angle, rho, trap_profile)
+            zmax = max_zpos(energy, center_pitch_angle, rho, trap_profile)
             B1 = lambda z: trap_profile.field_strength(rho_pp, z)
             B = lambda z: trap_profile.field_strength(rho_p, z)
             Bmax = trap_profile.field_strength(rho_p, zmax)
@@ -504,6 +531,7 @@ def b_avg_not_vect(energy, center_pitch_angle, rho, trap_profile):
         print("ERROR: Given trap profile is not a valid trap")
         return False
 
+
 def b_avg(energy, center_pitch_angle, rho, trap_profile):
 
     """Vectorized version of b_avg_not_vectorized function."""
@@ -524,7 +552,7 @@ def t_not_vect(energy, zpos, center_pitch_angle, rho, trap_profile):
         if center_pitch_angle == 90.0:
             center_pitch_angle = 89.999
 
-        zmax = max_zpos(energy,center_pitch_angle, rho, trap_profile)
+        zmax = max_zpos(energy, center_pitch_angle, rho, trap_profile)
         B = lambda z: trap_profile.field_strength(rho, z)
         Bmax = trap_profile.field_strength(rho, zmax)
 

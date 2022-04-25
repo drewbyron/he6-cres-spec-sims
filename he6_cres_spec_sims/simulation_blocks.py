@@ -120,10 +120,11 @@ class Config:
             The name of the config file contained in the
             he6_cres_spec_sims/config_files directory.
         """
-        self.load_config_file(config_path)
+        self.config_path = config_path
+        self.load_config_file()
         self.load_field_profile()
 
-    def load_config_file(self, config_path):
+    def load_config_file(self):
         """Loads the YAML config file and creates attributes associated
         with all configurable parameters.
 
@@ -140,10 +141,11 @@ class Config:
         """
 
         try:
-            with open(config_path, "r") as read_file:
+            with open(self.config_path, "r") as read_file:
                 config_dict = yaml.load(read_file, Loader=yaml.FullLoader)
 
                 # Take config parameters from config_file.
+                self.settings = DotDict(config_dict["Settings"])
                 self.physics = DotDict(config_dict["Physics"])
                 self.eventbuilder = DotDict(config_dict["EventBuilder"])
                 self.segmentbuilder = DotDict(config_dict["SegmentBuilder"])
@@ -190,7 +192,7 @@ class Config:
 class Physics:
     """TODO: DOCUMENT"""
 
-    def __init__(self, config):
+    def __init__(self, config, initialize_source = True):
 
         self.config = config
         self.bs = BetaSource(config)
@@ -201,10 +203,14 @@ class Physics:
 
         return self.bs.energy_array[beta_num]
 
+    def generate_beta_position_direction(self, beta_num):
 
-    def generate_beta_position_direction(self):
+        # Could maybe improve this by not generating a new one each time,
+        # it could be vectorized the way the energy is...
 
-        position, direction = sc.random_beta_generator(self.config.physics)
+        position, direction = sc.random_beta_generator(
+            self.config.physics, self.config.settings.rand_seed + beta_num
+        )
 
         return position, direction
 
@@ -225,27 +231,37 @@ class EventBuilder:
         event_num = 0
         # beta_num denotes the total number of betas produced in the trap.
         beta_num = 0
-        events_to_simulate = self.config.physics.events_to_simulate
 
-        while event_num < events_to_simulate:
+        events_to_simulate = self.config.physics.events_to_simulate
+        betas_to_simulate = self.config.physics.betas_to_simulate
+
+        if events_to_simulate == -1: events_to_simulate = np.inf
+        if betas_to_simulate == -1: betas_to_simulate = np.inf
+
+        print("events: ", events_to_simulate, "betas: ", betas_to_simulate)
+
+        while (event_num < events_to_simulate) and (beta_num < betas_to_simulate):
 
             print("\nEvent: {}/{}...\n".format(event_num, events_to_simulate - 1))
 
             # generate trapped beta
             is_trapped = False
 
-            while not is_trapped:
+            while (not is_trapped and beta_num < betas_to_simulate):
 
-                # Does this miss some betas??? Be sure it doesn't. 
+                print("\nBeta: {}/{}...\n".format(beta_num, betas_to_simulate - 1))
+
+                # Does this miss some betas??? Be sure it doesn't.
                 beta_num += 1
 
                 (
                     initial_position,
                     initial_direction,
-                ) = self.physics.generate_beta_position_direction()
+                ) = self.physics.generate_beta_position_direction(beta_num)
 
                 energy = self.physics.generate_beta_energy(beta_num)
-                print(energy)
+                print("Beta Energy: ", energy)
+
                 single_segment_df = self.construct_untrapped_segment_df(
                     initial_position, initial_direction, energy, event_num, beta_num
                 )
@@ -255,6 +271,9 @@ class EventBuilder:
             if event_num == 0:
 
                 trapped_event_df = single_segment_df
+
+            elif beta_num == betas_to_simulate: 
+                break
 
             else:
 
@@ -273,12 +292,12 @@ class EventBuilder:
         initial_rho_pos = beta_position[0]
         initial_phi_pos = beta_position[1]
 
-        initial_pitch_angle = beta_direction[0]
+        initial_theta = beta_direction[0]
         initial_phi_dir = beta_direction[1]
         initial_zpos = beta_position[2]
 
         initial_field = self.config.field_strength(initial_rho_pos, initial_zpos)
-        initial_radius = sc.cyc_radius(beta_energy, initial_field, initial_pitch_angle)
+        initial_radius = sc.cyc_radius(beta_energy, initial_field, initial_theta)
 
         # TODO: These center_x and center_y are a bit confusing. May
         # be nice to just build this into the power calc.
@@ -290,33 +309,41 @@ class EventBuilder:
         rho_center = np.sqrt(center_x**2 + center_y**2)
 
         center_theta = sc.theta_center(
-            initial_zpos, rho_center, initial_pitch_angle, self.config.trap_profile
+            initial_zpos, rho_center, initial_theta, self.config.trap_profile
         )
 
-        # Use trapped_initial_pitch_angle to determine if trapped.
-        trapped_initial_pitch_angle = sc.min_theta(
+        # Use trapped_initial_theta to determine if trapped.
+        trapped_initial_theta = sc.min_theta(
             rho_center, initial_zpos, self.config.trap_profile
         )
         max_radius = sc.max_radius(
             beta_energy, center_theta, rho_center, self.config.trap_profile
         )
 
+        min_radius = sc.min_radius(
+            beta_energy, center_theta, rho_center, self.config.trap_profile
+        )
+
         segment_properties = {
             "energy": beta_energy,
+            "gamma": sc.gamma(beta_energy),
             "energy_stop": 0.0,
             "initial_rho_pos": initial_rho_pos,
             "initial_phi_pos": initial_phi_pos,
             "initial_zpos": initial_zpos,
-            "initial_pitch_angle": initial_pitch_angle,
+            "initial_theta": initial_theta,
+            "cos_initial_theta": np.cos(initial_theta/RAD_TO_DEG),
             "initial_phi_dir": initial_phi_dir,
             "center_theta": center_theta,
+            "cos_center_theta": np.cos(center_theta/RAD_TO_DEG),
             "initial_field": initial_field,
             "initial_radius": initial_radius,
             "center_x": center_x,
             "center_y": center_y,
             "rho_center": rho_center,
-            "trapped_initial_pitch_angle": trapped_initial_pitch_angle,
+            "trapped_initial_theta": trapped_initial_theta,
             "max_radius": max_radius,
+            "min_radius": min_radius,
             "avg_cycl_freq": 0.0,
             "b_avg": 0.0,
             "freq_stop": 0.0,
@@ -331,7 +358,11 @@ class EventBuilder:
             "segment_num": 0,
             "event_num": event_num,
             "beta_num": beta_num,
-            "fraction_of_spectrum": self.physics.bs.fraction_of_spectrum
+            "fraction_of_spectrum": self.physics.bs.fraction_of_spectrum,
+            "energy_accept_high": self.physics.bs.energy_acceptance_high,
+            "energy_accept_low": self.physics.bs.energy_acceptance_low,
+            "gamma_accept_high": sc.gamma(self.physics.bs.energy_acceptance_high),
+            "gamma_accept_low": sc.gamma(self.physics.bs.energy_acceptance_low)
         }
 
         segment_df = pd.DataFrame(segment_properties, index=[event_num])
@@ -345,15 +376,15 @@ class EventBuilder:
         if segment_df.shape[0] != 1:
             raise ValueError("trap_condition(): Input segment not a single row.")
 
-        initial_pitch_angle = segment_df["initial_pitch_angle"][0]
-        trapped_initial_pitch_angle = segment_df["trapped_initial_pitch_angle"][0]
+        initial_theta = segment_df["initial_theta"][0]
+        trapped_initial_theta = segment_df["trapped_initial_theta"][0]
         rho_center = segment_df["rho_center"][0]
         max_radius = segment_df["max_radius"][0]
         energy = segment_df["energy"][0]
 
         trap_condition = 0
 
-        if initial_pitch_angle < trapped_initial_pitch_angle:
+        if initial_theta < trapped_initial_theta:
             print("Not Trapped: Pitch angle too small.")
             trap_condition += 1
 
@@ -361,20 +392,8 @@ class EventBuilder:
             print("Not Trapped: Collided with guide wall.")
             trap_condition += 1
 
-        # # For now cutting any electron whose cycl frequency is not in the right range.
-        # # Don't make this range too tight as it just uses an approximation
-        # # of the cycl_freq.
-        # print(approx_cycl_freq)
-        # print(energy)
-        # print(freq_acceptance_low,type(freq_acceptance_low))
-        # if (approx_cycl_freq < freq_acceptance_low) or (
-        #     approx_cycl_freq > freq_acceptance_high
-        # ):
-        #     print("Not Detectable: Approx cycl_freq outside of freq acceptance.")
-        #     trap_condition += 1
-
         if trap_condition == 0:
-            print("Trapped and Detectable!")
+            print("Trapped!")
             return True
         else:
             return False
@@ -429,7 +448,18 @@ class SegmentBuilder:
             jump_num = 0
 
             # The loop breaks when the trap condition is False or the jump_num exceeds self.jump_num_max.
+            # This forces us to check to see that the current beta is trapped even when we don't want any scattering.
+            # TODO: Improve the above issue. This will greatly improve run times.
             while True:
+
+                if jump_num >= self.config.segmentbuilder.jump_num_max:
+                    print(
+                        "Event reached jump_num_max : {}".format(
+                            self.config.segmentbuilder.jump_num_max
+                        )
+                    )
+                    break
+                    
                 print("Jump: {jump_num}".format(jump_num=jump_num))
                 scattered_segment = event.copy()
 
@@ -479,13 +509,13 @@ class SegmentBuilder:
                 if not is_trapped:
                     print("Event no longer trapped.")
                     break
-                if jump_num > self.config.segmentbuilder.jump_num_max:
-                    print(
-                        "Event reached jump_num_max : {}".format(
-                            self.config.segmentbuilder.jump_num_max
-                        )
-                    )
-                    break
+                # if jump_num > self.config.segmentbuilder.jump_num_max:
+                #     print(
+                #         "Event reached jump_num_max : {}".format(
+                #             self.config.segmentbuilder.jump_num_max
+                #         )
+                #     )
+                #     break
 
                 scattered_segment_df["segment_num"] = jump_num
                 scattered_segment_df["segment_length"] = self.segment_length()
@@ -522,7 +552,9 @@ class SegmentBuilder:
         # )
 
         # TODO: Make this more accurate as per discussion with RJ.
-        b_avg = sc.b_avg(df["energy"], df["center_theta"], df["rho_center"], trap_profile)
+        b_avg = sc.b_avg(
+            df["energy"], df["center_theta"], df["rho_center"], trap_profile
+        )
         avg_cycl_freq = sc.energy_to_freq(df["energy"], b_avg)
 
         zmax = sc.max_zpos(
@@ -635,8 +667,9 @@ class TrackBuilder:
 
         print("~~~~~~~~~~~~TrackBuilder Block~~~~~~~~~~~~~~\n")
         run_length = self.config.trackbuilder.run_length
-        events_to_simulate = self.config.physics.events_to_simulate
-
+        # events_to_simulate = self.config.physics.events_to_simulate
+        events_simulated = int(bands_df["event_num"].max()+1)
+        print("events simulated: ", events_simulated)
         # TODO: Event timing is not currently physical.
         # Add time/freq start/stop.
         tracks_df = bands_df.copy()
@@ -650,7 +683,7 @@ class TrackBuilder:
 
         # dealing with timing of the events.
         # for now just put all events in the window... need to think about this.
-        trapped_event_start_times = np.random.uniform(0, run_length, events_to_simulate)
+        trapped_event_start_times = np.random.uniform(0, run_length, events_simulated)
 
         # iterate through the segment zeros and fill in start times.
 
@@ -660,7 +693,7 @@ class TrackBuilder:
             #             print(event_num)
             tracks_df["time_start"][index] = trapped_event_start_times[event_num]
 
-        for event in range(0, events_to_simulate):
+        for event in range(0, events_simulated):
 
             # find max segment_num for each event
             segment_num_max = int(
@@ -696,8 +729,8 @@ class TrackBuilder:
         #     columns=[
         #         "initial_rho_pos",
         #         "initial_zpos",
-        #         "initial_pitch_angle",
-        #         "trapped_initial_pitch_angle",
+        #         "initial_theta",
+        #         "trapped_initial_theta",
         #         "initial_phi_dir",
         #         "center_theta",
         #         "initial_field",

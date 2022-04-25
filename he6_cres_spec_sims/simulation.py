@@ -62,8 +62,9 @@ class Simulation:
         bands = bandbuilder.run(segments)
         tracks = trackbuilder.run(bands)
         dmtracks = dmtrackbuilder.run(tracks)
-        spec_array = daq.run(dmtracks)
-        specbuilder.run(spec_array)
+        # Commenting out the following to make progress in other areas. 
+        # spec_array = daq.run(dmtracks)
+        # specbuilder.run(spec_array)
 
         # Save the results of the simulation:
         results = Results(events, segments, bands, tracks, dmtracks)
