@@ -33,7 +33,7 @@ class BetaSource:
         # Include all the sources here.
         self.isotopes = {
             "Ne19": {"Wmax": 5.337377690802349, "Z": 9, "A": 19},
-            "He6": {"Wmax": 0, "Z": 0, "A": 0},
+            "He6": {"Wmax": 7.864593361688904, "Z": 2, "A": 6},
         }
 
         if (self.source["beta_source"] == "Ne19") or (
