@@ -11,6 +11,9 @@ import yaml
 
 from . import simulation as sim
 from .simulation_blocks import Config
+# from .spec_tools import beta_source as source
+import he6_cres_spec_sims.spec_tools.beta_source.beta_source as source
+import he6_cres_spec_sims.spec_tools.spec_calc.spec_calc as sc
 
 # Utility function:
 def get_experiment_dir(experiment_params: dict) -> pathlib.Path:
@@ -32,7 +35,7 @@ def get_config_paths(experiment_params: dict) -> List[pathlib.Path]:
     config_paths = [
         x
         for x in experiment_dir.glob("**/*{}".format(suffix))
-        if (x.is_file() and ("ipynb" not in str(x)) )
+        if (x.is_file() and ("ipynb" not in str(x)))
     ]
 
     if len(config_paths) == 0:
@@ -160,10 +163,11 @@ class ExpResults:
     experiment_params: dict
     base_config: object
     config_paths: List[pathlib.Path]
+    sampled_gammas: pd.DataFrame
     experiment_results: pd.DataFrame
 
     @classmethod
-    def load(cls, experiment_params: dict = None, experiment_config_path: str = None):
+    def load(cls, experiment_params: dict = None, experiment_config_path: str = None, include_sampled_gammas = False):
 
         # Can either provide the experiment_params dict if you have it or a path to the
         # exp_config.yaml file.
@@ -174,7 +178,6 @@ class ExpResults:
             # Open the config file and grab the contents.
             with open(experiment_config_path, "r") as f:
                 experiment_params = yaml.load(f, Loader=yaml.FullLoader)
-            print(experiment_params)
 
         if (experiment_params is None) and (experiment_config_path is None):
 
@@ -186,6 +189,7 @@ class ExpResults:
             "experiment_params": experiment_params,
             "base_config": Config(experiment_params["base_config_path"]),
             "config_paths": None,
+            "sampled_gammas": None,
             "experiment_results": None,
         }
 
@@ -194,12 +198,20 @@ class ExpResults:
         exp_results_dict["config_paths"] = config_paths
 
         tracks_list = []
+        sampled_gammas = []
+        fields = []
+
+        # Figure out how many betas were sampled; depends on the mode (beta_num or event_num).
+        # Note that if this is -1 then you get the entire array (event_mode).
+        beta_num = experiment_params["betas_to_simulate"]
+
         for i, config_path in enumerate(config_paths):
 
             print("+++++++++++++++++++++++++++++++++++++++++++++++++\n\n")
             print("Loading simulation {} / {}\n\n".format(i, len(config_paths)))
             print("+++++++++++++++++++++++++++++++++++++++++++++++++")
 
+            # Get the simulation parameters from the config.
             config = Config(config_path)
             field = config.eventbuilder.main_field
             trap_current = config.eventbuilder.trap_current
@@ -211,12 +223,24 @@ class ExpResults:
             tracks["trap_current"] = trap_current
             tracks_list.append(tracks)
 
+            if include_sampled_gammas: 
+                # Get the betas that were sampled during the simulation.
+                beta_source_ne19 = source.BetaSource(config)
+                sampled_energies = beta_source_ne19.energy_array[: int(beta_num)]
+                sampled_gammas.append(sc.gamma(sampled_energies))
+                fields.append(field)
+
+        if include_sampled_gammas:
+            exp_results_dict["sampled_gammas"] = pd.DataFrame.from_dict(
+                dict(zip(fields, sampled_gammas))
+            )
         exp_results_dict["experiment_results"] = pd.concat(tracks_list)
 
         exp_results = cls(
             exp_results_dict["experiment_params"],
             exp_results_dict["base_config"],
             exp_results_dict["config_paths"],
+            exp_results_dict["sampled_gammas"],
             exp_results_dict["experiment_results"],
         )
 
