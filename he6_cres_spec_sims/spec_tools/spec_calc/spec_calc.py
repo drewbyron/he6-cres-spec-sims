@@ -45,6 +45,7 @@ M = 9.1093837015e-31  # Electron rest mass (kg).
 Q = 1.602176634e-19  # Electron charge (Coulombs).
 C = 299792458  # Speed of light in vacuum, in m/s
 J_TO_EV = 6.241509074e18  # Joule-ev conversion
+EPS_0 = 8.8541878128 * 10**-12  # Vacuum Permittivity (F/m)
 
 
 # Simple special relativity functions.
@@ -99,11 +100,20 @@ def energy_and_freq_to_field(energy, freq):
 
     """Converts kinetic energy to cyclotron frequency."""
 
-    # cycl_freq = Q * field / (2 * PI * gamma(energy) * M)
-
     field = (2 * PI * gamma(energy) * M * freq) / Q
 
     return field
+
+
+def power_from_slope(energy, slope, field):
+
+    """Converts slope, energy, field into the associated cres power."""
+
+    energy_Joules = (energy + ME) / J_TO_EV
+
+    power = slope * (2 * PI) * ((energy_Joules) ** 2) / (Q * field * C**2)
+
+    return power
 
 
 def random_beta_generator(parameter_dict, rand_seed):
@@ -618,3 +628,18 @@ def sideband_calc(avg_cycl_freq, axial_freq, zmax, num_sidebands=7):
         sidebands.append(pair)
 
     return sidebands, mod_index
+
+
+def power_larmor(field, frequency):
+
+    omega = 2 * PI * frequency
+    energy = freq_to_energy(frequency, field)
+    r_c = cyc_radius(energy, field, 90)
+    beta = velocity(energy) / C
+    p = gamma(energy) * M * velocity(energy)
+
+    power_larmor = (2 / 3 * Q**2 * C * beta**4 * gamma(energy)**4) / (
+        4 * PI * EPS_0 * r_c**2
+    )
+
+    return power_larmor
