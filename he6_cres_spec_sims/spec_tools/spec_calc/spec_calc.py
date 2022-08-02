@@ -356,9 +356,7 @@ def mod_index(avg_cycl_freq, zmax):
     k_wave = omega / C
     beta = np.sqrt(k_wave**2 - kc**2)
 
-    phase_vel = omega / beta
-
-    mod_index = omega * zmax / phase_vel
+    mod_index = zmax * beta
 
     return mod_index
 
@@ -638,7 +636,7 @@ def power_larmor(field, frequency):
     beta = velocity(energy) / C
     p = gamma(energy) * M * velocity(energy)
 
-    power_larmor = (2 / 3 * Q**2 * C * beta**4 * gamma(energy)**4) / (
+    power_larmor = (2 / 3 * Q**2 * C * beta**4 * gamma(energy) ** 4) / (
         4 * PI * EPS_0 * r_c**2
     )
 
